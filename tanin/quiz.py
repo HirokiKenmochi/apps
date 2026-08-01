@@ -22,7 +22,7 @@ from decimal import Decimal
 from fractions import Fraction
 from typing import Any
 
-from tanin import ohm
+from tanin import ohm, units
 from tanin.ohm import fmt
 from tanin.units import parse_number
 
@@ -41,6 +41,7 @@ __all__ = [
     "generate_quiz",
     "grade",
     "is_clean",
+    "labelled",
 ]
 
 MAX_ATTEMPTS = 200
@@ -61,6 +62,9 @@ class Category:
 
 
 CATEGORIES: tuple[Category, ...] = (
+    Category("division", "わり算の筆算", "整数・小数のわり算（小学生向け）"),
+    Category("decimal_point", "小数点の動かし方", "10倍・100倍・1000倍と、10・100・1000でわる計算"),
+    Category("unit_convert", "単位の変換", "cm と m、g と kg、mL と L、分と秒など（小学生向け）"),
     Category("ohm_basic", "オームの法則の基本", "V=RI / I=V÷R / R=V÷I"),
     Category("unit_calc", "単位の換算", "mA・kΩ を含む計算"),
     Category("series", "直列回路", "合成抵抗・電流・各抵抗の電圧"),
@@ -107,7 +111,7 @@ class Question:
 
     @property
     def answer_text(self) -> str:
-        return f"{fmt(self.answer)} {self.unit}"
+        return labelled(self.answer, self.unit)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -173,11 +177,20 @@ def _looks_numeric(text: str) -> bool:
 # --------------------------------------------------------------------------
 # きれいな値の判定
 # --------------------------------------------------------------------------
-def is_clean(value: Fraction) -> bool:
-    """小数第 2 位までで割り切れ、学習に使える大きさの正の値か。"""
+def labelled(value: Fraction, unit: str) -> str:
+    """「12.5 cm」のように値と単位をつなぐ（単位なしの問題では数だけ）。"""
+    return f"{fmt(value)} {unit}".strip()
+
+
+def is_clean(value: Fraction, max_decimals: int = 2) -> bool:
+    """指定した小数位までで割り切れ、学習に使える大きさの正の値か。
+
+    ふつうの問題は小数第 2 位まで。小数点の練習だけは第 3 位まで許す
+    （1000 でわると 0.003 のように 3 けたになるため）。
+    """
     if value <= 0:
         return False
-    if (value * 100).denominator != 1:
+    if (value * 10 ** max_decimals).denominator != 1:
         return False
     return value <= 10_000_000
 
@@ -209,6 +222,14 @@ def _decimal_places(value: Fraction) -> int:
     if "." not in text or "e" in text:
         return 0
     return len(text.split(".")[1])
+
+
+def _power_of_ten(ratio: Fraction) -> int | None:
+    """10 の何乗かを返す（10・100・1000 … でないときは None）。"""
+    for power in range(-6, 7):
+        if ratio == Fraction(10) ** power:
+            return power
+    return None
 
 
 def _shift_note(before: Fraction, after: Fraction, power: int) -> str:
@@ -527,7 +548,7 @@ def _choices(
         return None
     options = [*pool[:3], answer]
     rng.shuffle(options)
-    texts = tuple(f"{fmt(o)} {unit}" for o in options)
+    texts = tuple(labelled(o, unit) for o in options)
     return texts, options.index(answer)
 
 
@@ -545,9 +566,10 @@ def _build(
     distractors: Sequence[Fraction] = (),
     circuit: dict[str, Any] | None = None,
     force_numeric: bool = False,
+    max_decimals: int = 2,
 ) -> Question | None:
     """答えがきれいなら Question を作る。そうでなければ None（＝再抽選）。"""
-    if not is_clean(answer):
+    if not is_clean(answer, max_decimals):
         return None
 
     base = {
@@ -1036,7 +1058,371 @@ def _p_power_heat(rng: random.Random, difficulty: str) -> Question | None:
     )
 
 
+# --------------------------------------------------------------------------
+# 出題パターン：わり算の筆算（小学生向け）
+# --------------------------------------------------------------------------
+_PLACE_NAMES: dict[int, str] = {
+    4: "一万の位",
+    3: "千の位",
+    2: "百の位",
+    1: "十の位",
+    0: "一の位",
+    -1: "小数第1位",
+    -2: "小数第2位",
+    -3: "小数第3位",
+}
+
+
+def _place_name(power: int) -> str:
+    return _PLACE_NAMES.get(power, f"10^{power} の位")
+
+
+def _division_walkthrough(dividend: int, divisor: int, max_decimals: int = 2) -> str:
+    """整数どうしのわり算の筆算を、上の位から順に 1 行ずつ説明する。"""
+    digits = str(dividend)
+    top = len(digits) - 1
+    lines: list[str] = []
+    remainder = 0
+    started = False
+    for index, char in enumerate(digits):
+        power = top - index
+        current = remainder * 10 + int(char)
+        quotient, remainder = divmod(current, divisor)
+        if quotient == 0 and not started:
+            lines.append(f"- {current} に {divisor} は入らない → {_place_name(power)} には書かずに次の位へ")
+            continue
+        started = True
+        lines.append(
+            f"- {current} ÷ {divisor} = {quotient} あまり {remainder}"
+            f" → {_place_name(power)} に **{quotient}** をたてる"
+        )
+    if remainder:
+        lines.append(f"- あまりが {remainder} なので、小数点をうって 0 をおろす")
+    power = -1
+    while remainder and power >= -max_decimals:
+        current = remainder * 10
+        quotient, remainder = divmod(current, divisor)
+        lines.append(
+            f"- {current} ÷ {divisor} = {quotient} あまり {remainder}"
+            f" → {_place_name(power)} に **{quotient}** をたてる"
+        )
+        power -= 1
+    return "\n".join(lines)
+
+
+_DIVISORS: dict[str, tuple[int, ...]] = {
+    "easy": (2, 3, 4, 5, 6),
+    "normal": (3, 4, 6, 7, 8, 9, 12),
+    "hard": (12, 14, 15, 16, 18, 24, 25, 32),
+}
+_QUOTIENTS: dict[str, tuple[int, ...]] = {
+    "easy": tuple(range(11, 50)),
+    "normal": tuple(range(12, 100)),
+    "hard": tuple(range(23, 100)),
+}
+
+
+def _p_division_exact(rng: random.Random, difficulty: str) -> Question | None:
+    divisor = rng.choice(_DIVISORS[difficulty])
+    quotient = rng.choice(_QUOTIENTS[difficulty])
+    dividend = divisor * quotient
+    answer = Fraction(quotient)
+    return _build(
+        rng,
+        category="division",
+        difficulty=difficulty,
+        pattern="division_exact",
+        prompt=f"{dividend} ÷ {divisor} を筆算で計算しましょう。答えはいくつですか。",
+        answer=answer,
+        unit="",
+        explanation=_steps(
+            f"① {dividend} ÷ {divisor} を、上の位から順に計算する。",
+            _division_walkthrough(dividend, divisor),
+            f"② 答えは **{quotient}**",
+            f"たしかめ算：{divisor} × {quotient} = {dividend} なので合っているよ。",
+        ),
+        given={"a": Fraction(dividend), "b": Fraction(divisor)},
+        distractors=[
+            Fraction(dividend, divisor * 10),
+            Fraction(dividend * 10, divisor),
+            Fraction(dividend - divisor),
+        ],
+    )
+
+
+def _p_division_decimal(rng: random.Random, difficulty: str) -> Question | None:
+    divisor = rng.choice(_DIVISORS[difficulty])
+    dividend = rng.randrange(11, 400 if difficulty == "easy" else 900)
+    answer = Fraction(dividend, divisor)
+    if answer.denominator == 1:  # 割り切れる問題は別パターンにまかせる
+        return None
+    return _build(
+        rng,
+        category="division",
+        difficulty=difficulty,
+        pattern="division_decimal",
+        prompt=f"{dividend} ÷ {divisor} を筆算で計算しましょう。答えはいくつですか。",
+        answer=answer,
+        unit="",
+        explanation=_steps(
+            f"① {dividend} ÷ {divisor} を、上の位から順に計算する。",
+            _division_walkthrough(dividend, divisor),
+            f"② 答えは **{fmt(answer)}**",
+            "ポイント：わり切れないときは、**小数点をうって 0 をおろす**とつづきが計算できるよ。",
+        ),
+        given={"a": Fraction(dividend), "b": Fraction(divisor)},
+        distractors=[answer * 10, answer / 10, Fraction(dividend // divisor)],
+    )
+
+
+_DECIMAL_DIVISORS: dict[str, tuple[Fraction, ...]] = {
+    "easy": _f("0.2", "0.5", "0.4"),
+    "normal": _f("0.2", "0.25", "0.3", "0.5", "1.5", "2.5"),
+    "hard": _f("0.05", "0.08", "0.12", "0.15", "0.25", "0.75", "1.25", "2.5"),
+}
+
+
+def _p_division_by_decimal(rng: random.Random, difficulty: str) -> Question | None:
+    divisor = rng.choice(_DECIMAL_DIVISORS[difficulty])
+    dividend = Fraction(rng.randrange(2, 60 if difficulty == "easy" else 200))
+    answer = dividend / divisor
+    places = _decimal_places(divisor)
+    factor = 10 ** places
+    return _build(
+        rng,
+        category="division",
+        difficulty=difficulty,
+        pattern="division_by_decimal",
+        prompt=f"{fmt(dividend)} ÷ {fmt(divisor)} を計算しましょう。答えはいくつですか。",
+        answer=answer,
+        unit="",
+        explanation=_steps(
+            f"① わる数 {fmt(divisor)} が小数なので、**わる数とわられる数を同じだけ {factor} 倍**する"
+            f"（小数点を右に {places} つ）。{fmt(dividend)} ÷ {fmt(divisor)} → "
+            f"**{fmt(dividend * factor)} ÷ {fmt(divisor * factor)}**",
+            f"② {fmt(dividend * factor)} ÷ {fmt(divisor * factor)} を筆算する。",
+            _division_walkthrough(int(dividend * factor), int(divisor * factor)),
+            f"③ 答えは **{fmt(answer)}**",
+            "ポイント：同じ数をかけているので、**答えは変わらない**よ。",
+        ),
+        given={"a": dividend, "b": divisor},
+        distractors=[dividend * divisor, answer / 10, answer * 10],
+    )
+
+
+# --------------------------------------------------------------------------
+# 出題パターン：小数点の動かし方（小学生向け）
+# --------------------------------------------------------------------------
+_DECIMAL_VALUES: dict[str, tuple[Fraction, ...]] = {
+    "easy": _f("0.5", "0.7", "1.2", "2.5", "3.4", "6", "12"),
+    "normal": _f("0.25", "0.08", "1.05", "3.6", "4.75", "12.5", "40"),
+    "hard": _f("0.006", "0.045", "0.125", "2.08", "7.25", "36.4", "125"),
+}
+_TEN_POWERS: dict[str, tuple[int, ...]] = {"easy": (1, 2), "normal": (1, 2, 3), "hard": (2, 3)}
+
+
+def _p_decimal_multiply(rng: random.Random, difficulty: str) -> Question | None:
+    value = rng.choice(_DECIMAL_VALUES[difficulty])
+    power = rng.choice(_TEN_POWERS[difficulty])
+    times = 10 ** power
+    answer = value * times
+    return _build(
+        rng,
+        category="decimal_point",
+        difficulty=difficulty,
+        pattern="decimal_multiply",
+        prompt=f"{fmt(value)} を {times} 倍すると、いくつになりますか。",
+        answer=answer,
+        unit="",
+        explanation=_steps(
+            f"① {times} をかけるときは、**小数点を右に {power} つ**動かす。",
+            f"② {fmt(value)} → **{fmt(answer)}**",
+            "ポイント：けたが足りなくなったら 0 を書きたす（例：0.25 × 1000 → 250）。",
+        ),
+        given={"v": value, "power": Fraction(power)},
+        distractors=[value / times, value * 10 ** (power + 1), value * 10 ** max(power - 1, 0)],
+        max_decimals=3,
+    )
+
+
+def _p_decimal_divide(rng: random.Random, difficulty: str) -> Question | None:
+    value = rng.choice(_DECIMAL_VALUES[difficulty]) * rng.choice([10, 100, 1000])
+    power = rng.choice(_TEN_POWERS[difficulty])
+    times = 10 ** power
+    answer = value / times
+    return _build(
+        rng,
+        category="decimal_point",
+        difficulty=difficulty,
+        pattern="decimal_divide",
+        prompt=f"{fmt(value)} を {times} でわると、いくつになりますか。",
+        answer=answer,
+        unit="",
+        explanation=_steps(
+            f"① {times} でわるときは、**小数点を左に {power} つ**動かす。",
+            f"② {fmt(value)} → **{fmt(answer)}**",
+            "ポイント：けたが足りなくなったら 0 を書きたす（例：3 ÷ 1000 → 0.003）。",
+        ),
+        given={"v": value, "power": Fraction(power)},
+        distractors=[value * times, value / 10 ** (power + 1), value / 10 ** max(power - 1, 0)],
+        max_decimals=3,
+    )
+
+
+def _p_decimal_factor(rng: random.Random, difficulty: str) -> Question | None:
+    value = rng.choice(_DECIMAL_VALUES[difficulty])
+    power = rng.choice(_TEN_POWERS[difficulty])
+    times = 10 ** power
+    result = value * times
+    return _build(
+        rng,
+        category="decimal_point",
+        difficulty=difficulty,
+        pattern="decimal_factor",
+        prompt=f"{fmt(value)} を何倍すると {fmt(result)} になりますか。",
+        answer=Fraction(times),
+        unit="倍",
+        explanation=_steps(
+            f"① 小数点がどちらへいくつ動いたかを見る。{fmt(value)} → {fmt(result)} は"
+            f"**右に {power} つ**動いている。",
+            f"② 右に {power} つ動かすのは {times} 倍のとき。答えは **{times} 倍**",
+            "ポイント：右に動けばかけ算、左に動けばわり算だよ。",
+        ),
+        given={"v": value, "result": result},
+        distractors=[Fraction(times * 10), Fraction(times // 10 or 1), Fraction(power)],
+    )
+
+
+# --------------------------------------------------------------------------
+# 出題パターン：単位の変換（小学生向け）
+#
+# 換算そのものは tanin.units のデータを使う（表を二重管理しない）。
+# --------------------------------------------------------------------------
+_UNIT_PAIRS: dict[str, tuple[tuple[str, str], ...]] = {
+    "easy": (
+        ("cm", "m"),
+        ("m", "cm"),
+        ("mm", "cm"),
+        ("cm", "mm"),
+        ("g", "kg"),
+        ("kg", "g"),
+        ("mL", "L"),
+        ("L", "mL"),
+    ),
+    "normal": (
+        ("m", "km"),
+        ("km", "m"),
+        ("cm", "m"),
+        ("m", "cm"),
+        ("g", "kg"),
+        ("kg", "g"),
+        ("kg", "t"),
+        ("mL", "L"),
+        ("L", "mL"),
+        ("cm³", "mL"),
+    ),
+    "hard": (
+        ("mm", "m"),
+        ("m", "mm"),
+        ("km", "cm"),
+        ("g", "t"),
+        ("t", "kg"),
+        ("mL", "kL"),
+        ("cm²", "m²"),
+        ("m²", "cm²"),
+    ),
+}
+_UNIT_VALUES: dict[str, tuple[Fraction, ...]] = {
+    "easy": _f("2", "3", "5", "8", "10", "20", "50", "100", "200", "500", "1000"),
+    "normal": _f("1.5", "2.5", "25", "60", "120", "250", "750", "1200", "2500", "3500"),
+    "hard": _f("0.5", "4.5", "45", "125", "480", "1250", "3600", "12500", "45000"),
+}
+
+
+def _p_unit_metric(rng: random.Random, difficulty: str) -> Question | None:
+    from_symbol, to_symbol = rng.choice(_UNIT_PAIRS[difficulty])
+    value = rng.choice(_UNIT_VALUES[difficulty])
+    result = units.convert(value, from_symbol, to_symbol)
+    answer = result.value
+    src, dst = result.from_unit, result.to_unit
+    ratio = src.ratio / dst.ratio
+    power = _power_of_ten(ratio)
+    if power is None:  # 10 の何倍かで表せない組み合わせは別パターンにまかせる
+        return None
+    times = 10 ** abs(power)
+    if power > 0:
+        # 大きい単位 → 小さい単位（例: m → mm）。1 m = 1000 mm
+        how = f"**{times} をかける**（小数点を右に {abs(power)} つ）"
+        rule = f"1 {from_symbol} = {times} {to_symbol}"
+    elif power < 0:
+        # 小さい単位 → 大きい単位（例: cm → m）。1 m = 100 cm
+        how = f"**{times} でわる**（小数点を左に {abs(power)} つ）"
+        rule = f"1 {to_symbol} = {times} {from_symbol}"
+    else:
+        # 同じ大きさの単位（例: cm³ と mL）
+        how = "**数はそのまま**でよい"
+        rule = f"1 {from_symbol} = 1 {to_symbol}"
+    return _build(
+        rng,
+        category="unit_convert",
+        difficulty=difficulty,
+        pattern="unit_metric",
+        prompt=f"{fmt(value)} {from_symbol} は何 {to_symbol} ですか。",
+        answer=answer,
+        unit=to_symbol,
+        explanation=_steps(
+            f"① おぼえること：{rule}（{from_symbol} ＝ {src.name}、{to_symbol} ＝ {dst.name}）",
+            f"② {from_symbol} から {to_symbol} に直すときは {how}",
+            f"③ {fmt(value)} → **{fmt(answer)} {to_symbol}**",
+            "ポイント：大きい単位に直すと数は小さく、小さい単位に直すと数は大きくなるよ。",
+        ),
+        given={"value": value, "from": from_symbol, "to": to_symbol},
+        distractors=[value / ratio, answer * 10, answer / 10],
+    )
+
+
+_TIME_PAIRS: dict[str, tuple[tuple[str, str], ...]] = {
+    "easy": (("min", "s"), ("h", "min")),
+    "normal": (("min", "s"), ("s", "min"), ("h", "min"), ("min", "h"), ("d", "h")),
+    "hard": (("s", "min"), ("min", "h"), ("h", "s"), ("d", "h"), ("h", "min")),
+}
+_TIME_LABELS: dict[str, str] = {"s": "秒", "min": "分", "h": "時間", "d": "日"}
+
+
+def _p_unit_time(rng: random.Random, difficulty: str) -> Question | None:
+    from_symbol, to_symbol = rng.choice(_TIME_PAIRS[difficulty])
+    value = rng.choice(
+        _f("1", "2", "3", "5", "10", "15", "20", "30", "45", "60", "90", "120", "180")
+        if difficulty != "easy"
+        else _f("1", "2", "3", "5", "10", "15", "20", "30")
+    )
+    answer = units.convert(value, from_symbol, to_symbol).value
+    from_label, to_label = _TIME_LABELS[from_symbol], _TIME_LABELS[to_symbol]
+    ratio = units.get_unit(from_symbol).ratio / units.get_unit(to_symbol).ratio
+    how = f"**{fmt(ratio)} をかける**" if ratio > 1 else f"**{fmt(1 / ratio)} でわる**"
+    return _build(
+        rng,
+        category="unit_convert",
+        difficulty=difficulty,
+        pattern="unit_time",
+        prompt=f"{fmt(value)} {from_label}は何{to_label}ですか。",
+        answer=answer,
+        unit=to_label,
+        explanation=_steps(
+            "① おぼえること：1 分 = 60 秒、1 時間 = 60 分、1 日 = 24 時間",
+            f"② {from_label} から {to_label} に直すときは {how}",
+            f"③ {fmt(value)} {from_label} → **{fmt(answer)} {to_label}**",
+            "ポイント：時間だけは 10 のかたまりではなく **60 のかたまり**。小数点を動かす方法は使えないよ。",
+        ),
+        given={"value": value, "from": from_symbol, "to": to_symbol},
+        distractors=[value * 10, value / 10, answer / 60 if answer > 60 else answer * 60],
+    )
+
+
 _PATTERNS: dict[str, tuple[Pattern, ...]] = {
+    "division": (_p_division_exact, _p_division_decimal, _p_division_by_decimal),
+    "decimal_point": (_p_decimal_multiply, _p_decimal_divide, _p_decimal_factor),
+    "unit_convert": (_p_unit_metric, _p_unit_time),
     "ohm_basic": (_p_ohm_voltage, _p_ohm_current, _p_ohm_resistance),
     "unit_calc": (_p_unit_voltage, _p_unit_current, _p_unit_resistance),
     "series": (_p_series_total, _p_series_current, _p_series_drop),
@@ -1057,7 +1443,72 @@ def _fallback(rng: random.Random, category: str, difficulty: str) -> Question:
     r = rng.choice([2, 4, 5, 10, 20, 25, 50])
     i = rng.choice([1, 2, 3, 5])
     n = rng.choice([2, 3])
-    if category == "series":
+    if category == "division":
+        divisor = rng.choice([2, 3, 4, 5])
+        quotient = rng.choice([12, 21, 32, 41])
+        dividend = divisor * quotient
+        question = _build(
+            rng,
+            category=category,
+            difficulty=difficulty,
+            pattern="division_exact",
+            prompt=f"{dividend} ÷ {divisor} を筆算で計算しましょう。答えはいくつですか。",
+            answer=Fraction(quotient),
+            unit="",
+            explanation=_steps(
+                f"① {dividend} ÷ {divisor} を、上の位から順に計算する。",
+                _division_walkthrough(dividend, divisor),
+                f"② 答えは **{quotient}**",
+                f"たしかめ算：{divisor} × {quotient} = {dividend}",
+            ),
+            given={"a": Fraction(dividend), "b": Fraction(divisor)},
+            distractors=[
+                Fraction(dividend, divisor * 10),
+                Fraction(dividend * 10, divisor),
+                Fraction(dividend - divisor),
+            ],
+        )
+    elif category == "decimal_point":
+        value = Fraction(rng.choice([25, 5, 12]), 10)
+        power = rng.choice([1, 2, 3])
+        times = 10 ** power
+        answer = value * times
+        question = _build(
+            rng,
+            category=category,
+            difficulty=difficulty,
+            pattern="decimal_multiply",
+            prompt=f"{fmt(value)} を {times} 倍すると、いくつになりますか。",
+            answer=answer,
+            unit="",
+            explanation=_steps(
+                f"① {times} をかけるときは、**小数点を右に {power} つ**動かす。",
+                f"② {fmt(value)} → **{fmt(answer)}**",
+            ),
+            given={"v": value, "power": Fraction(power)},
+            distractors=[value / times, value * 10 ** (power + 1), value * 10 ** max(power - 1, 0)],
+            max_decimals=3,
+        )
+    elif category == "unit_convert":
+        value = Fraction(rng.choice([200, 300, 500, 1500]))
+        answer = units.convert(value, "cm", "m").value
+        question = _build(
+            rng,
+            category=category,
+            difficulty=difficulty,
+            pattern="unit_metric",
+            prompt=f"{fmt(value)} cm は何 m ですか。",
+            answer=answer,
+            unit="m",
+            explanation=_steps(
+                "① おぼえること：1 m = 100 cm",
+                "② cm から m に直すときは **100 でわる**（小数点を左に 2 つ）",
+                f"③ {fmt(value)} → **{fmt(answer)} m**",
+            ),
+            given={"value": value, "from": "cm", "to": "m"},
+            distractors=[value * 100, answer * 10, answer / 10],
+        )
+    elif category == "series":
         rs = tuple(Fraction(r * (k + 1)) for k in range(n))
         total = ohm.series_resistance(rs)
         question = _build(

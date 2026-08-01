@@ -12,8 +12,11 @@ from typing import Any
 
 import pytest
 
-from tanin import quiz
+from tanin import quiz, units
 from tanin.quiz import Question, generate_question, generate_quiz, grade, is_clean
+
+# 小数点の練習だけは小数第 3 位まで許す（1000 でわると 0.003 になるため）
+MAX_DECIMALS = {"decimal_point": 3}
 
 
 # --------------------------------------------------------------------------
@@ -26,6 +29,21 @@ def _parallel(values: tuple[Fraction, ...]) -> Fraction:
 def _expected(question: Question) -> Fraction:
     g: dict[str, Any] = question.given
     pattern = question.pattern
+    if pattern == "division_exact" or pattern == "division_decimal":
+        return g["a"] / g["b"]
+    if pattern == "division_by_decimal":
+        return g["a"] / g["b"]
+    if pattern == "decimal_multiply":
+        return g["v"] * 10 ** int(g["power"])
+    if pattern == "decimal_divide":
+        return g["v"] / 10 ** int(g["power"])
+    if pattern == "decimal_factor":
+        return g["result"] / g["v"]
+    if pattern in ("unit_metric", "unit_time"):
+        # units.convert ではなく、単位データの係数から直接組み立てて検算する
+        source = units.get_unit(str(g["from"]))
+        target = units.get_unit(str(g["to"]))
+        return g["value"] * source.ratio / target.ratio
     if pattern == "ohm_voltage":
         return g["R"] * g["I"]
     if pattern == "ohm_current":
@@ -88,8 +106,9 @@ def test_generate_1000_questions_all_have_clean_answers() -> None:
     questions = _all_questions(60)  # 6 カテゴリ × 3 難易度 × 60 = 1080 問
     assert len(questions) >= 1000
     for q in questions:
-        assert is_clean(q.answer), f"割り切れない答え: {q.pattern} → {q.answer} ({q.prompt})"
-        assert (q.answer * 100).denominator == 1
+        limit = MAX_DECIMALS.get(q.category, 2)
+        assert is_clean(q.answer, limit), f"割り切れない答え: {q.pattern} → {q.answer} ({q.prompt})"
+        assert (q.answer * 10**limit).denominator == 1
 
 
 def test_generated_answers_match_independent_calculation() -> None:
@@ -101,6 +120,14 @@ def test_every_pattern_is_reachable() -> None:
     """定義したすべての出題パターンが実際に生成されること。"""
     seen = {q.pattern for q in _all_questions(80, seed=99)}
     expected = {
+        "division_exact",
+        "division_decimal",
+        "division_by_decimal",
+        "decimal_multiply",
+        "decimal_divide",
+        "decimal_factor",
+        "unit_metric",
+        "unit_time",
         "ohm_voltage",
         "ohm_current",
         "ohm_resistance",
@@ -141,10 +168,13 @@ def test_same_seed_reproduces_same_question() -> None:
 # 問題の形式
 # --------------------------------------------------------------------------
 def test_questions_have_prompt_unit_and_explanation() -> None:
+    unitless = {"division", "decimal_point"}  # わり算・小数点は単位のない計算問題
     for q in _all_questions(10, seed=3):
         assert q.prompt.strip()
-        assert q.unit.strip()
         assert q.explanation.strip()
+        if q.category not in unitless:
+            assert q.unit.strip(), f"単位がない: {q.pattern}"
+        assert q.answer_text.strip() == q.answer_text  # 前後に余計な空白を付けない
         assert q.category in quiz.CATEGORY_KEYS
         assert q.difficulty in quiz.DIFFICULTIES
 
@@ -203,7 +233,7 @@ def test_falls_back_when_every_pattern_fails(monkeypatch: pytest.MonkeyPatch) ->
 def test_fallback_is_clean_for_every_category(category: str) -> None:
     for seed in range(20):
         question = quiz._fallback(random.Random(seed), category, "normal")
-        assert is_clean(question.answer)
+        assert is_clean(question.answer, MAX_DECIMALS.get(question.category, 2))
         assert question.answer == _expected(question)
 
 
@@ -221,7 +251,7 @@ def test_generate_quiz_returns_requested_count() -> None:
     questions = generate_quiz(["ohm_basic", "power"], "normal", 10, random.Random(4))
     assert len(questions) == 10
     assert {q.category for q in questions} == {"ohm_basic", "power"}
-    assert all(is_clean(q.answer) for q in questions)
+    assert all(is_clean(q.answer, MAX_DECIMALS.get(q.category, 2)) for q in questions)
 
 
 def test_generate_quiz_requires_categories() -> None:
@@ -301,3 +331,90 @@ def test_question_json_round_trip() -> None:
         assert restored == q
         assert restored.answer == q.answer
         assert restored.given == q.given
+
+
+# --------------------------------------------------------------------------
+# 小学生向けカテゴリ（わり算の筆算・小数点・単位の変換）
+# --------------------------------------------------------------------------
+def test_division_walkthrough_explains_each_place() -> None:
+    """筆算の説明が、上の位から順に 1 行ずつ出ること。"""
+    text = quiz._division_walkthrough(84, 4)
+    assert "十の位" in text
+    assert "一の位" in text
+    assert "**2**" in text and "**1**" in text  # 84 ÷ 4 = 21
+
+    # 割り切れないときは小数点をうって続きを計算する
+    text = quiz._division_walkthrough(9, 4)
+    assert "小数点をうって" in text
+    assert "小数第1位" in text and "小数第2位" in text  # 9 ÷ 4 = 2.25
+
+
+def test_division_questions_are_kid_sized() -> None:
+    rng = random.Random(31)
+    for _ in range(60):
+        q = generate_question("division", "easy", rng)
+        assert q.answer == _expected(q)
+        assert q.given["b"] <= 10  # わる数は 1 けた
+        assert q.answer < 1000
+
+
+def test_division_exact_answers_are_integers() -> None:
+    rng = random.Random(32)
+    found = 0
+    for _ in range(60):
+        q = generate_question("division", "normal", rng)
+        if q.pattern == "division_exact":
+            found += 1
+            assert q.answer.denominator == 1
+    assert found > 0
+
+
+def test_decimal_point_questions_move_the_point() -> None:
+    rng = random.Random(33)
+    for _ in range(60):
+        q = generate_question("decimal_point", "normal", rng)
+        assert q.answer == _expected(q)
+        if q.pattern in ("decimal_multiply", "decimal_divide"):
+            ratio = q.answer / q.given["v"]
+            assert ratio in (
+                Fraction(10),
+                Fraction(100),
+                Fraction(1000),
+                Fraction(1, 10),
+                Fraction(1, 100),
+                Fraction(1, 1000),
+            )
+        else:  # decimal_factor は「何倍か」を答える
+            assert q.answer in (Fraction(10), Fraction(100), Fraction(1000))
+
+
+def test_unit_convert_matches_the_unit_data() -> None:
+    """単位変換の答えが tanin.units の換算と一致すること（表を二重管理していない）。"""
+    rng = random.Random(34)
+    for _ in range(80):
+        q = generate_question("unit_convert", rng.choice(list(quiz.DIFFICULTIES)), rng)
+        expected = units.convert(q.given["value"], str(q.given["from"]), str(q.given["to"]))
+        assert q.answer == expected.value
+        assert q.unit  # 答えには単位が付く
+
+
+def test_unit_convert_uses_only_kid_friendly_units() -> None:
+    allowed = {
+        "mm", "cm", "m", "km", "mg", "g", "kg", "t",
+        "mL", "L", "kL", "cm³", "m²", "cm²", "s", "min", "h", "d",
+    }
+    rng = random.Random(35)
+    for _ in range(80):
+        q = generate_question("unit_convert", rng.choice(list(quiz.DIFFICULTIES)), rng)
+        assert str(q.given["from"]) in allowed
+        assert str(q.given["to"]) in allowed
+
+
+def test_thirty_questions_in_a_row_are_all_clean() -> None:
+    """小学生向け 3 カテゴリを 30 問連続で解いても、割り切れない答えが出ないこと。"""
+    rng = random.Random(36)
+    questions = generate_quiz(["division", "decimal_point", "unit_convert"], "normal", 30, rng)
+    assert len(questions) == 30
+    for q in questions:
+        assert is_clean(q.answer, MAX_DECIMALS.get(q.category, 2))
+        assert q.answer == _expected(q)
