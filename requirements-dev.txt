@@ -1,0 +1,4 @@
+# 開発用（テストと Lint）。本番デプロイでは入れない
+-r requirements.txt
+pytest>=8.0
+ruff>=0.5

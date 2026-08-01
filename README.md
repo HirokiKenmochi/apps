@@ -43,13 +43,36 @@ python3 -m venv .venv
 - PC から: `http://localhost:8501`
 - 同じ Wi-Fi のスマホから: 起動時に表示される **Network URL**（`http://192.168.x.x:8501`）
 
-インターネット上には公開されません（ローカル起動のみ）。
+ローカル起動だけなら、インターネット上には公開されません。
+
+## インターネットに公開する（Streamlit Community Cloud）
+
+無料で、誰でもスマホから開ける URL を作れます。**GitHub アカウントでのログインが必要なので、
+次の手順はご本人の操作でお願いします**（所要 5 分ほど）。
+
+1. https://share.streamlit.io を開く
+2. **Continue with GitHub** でログイン（このリポジトリを持っている GitHub アカウント）
+3. リポジトリが Private の場合、途中で「private リポジトリへのアクセス許可」を求められるので許可する
+4. **Create app** →「Deploy a public app from GitHub」を選び、次を入力
+   - Repository: `HirokiKenmochi/apps`
+   - Branch: `main`
+   - Main file path: `app.py`
+   - App URL: 好きな名前（例 `tanin`）→ 公開 URL は `https://tanin.streamlit.app`
+5. **Deploy** を押す。1〜3 分でビルドが終わり、URL が使えるようになります
+
+補足
+
+- 公開後は `git push` するたびに自動で再デプロイされます
+- 学習履歴はブラウザのセッションにだけ残ります。サーバーには保存されないので、
+  同じ URL を複数人が開いてもデータは混ざりません
+- 依存関係は `requirements.txt`（実行に必要なものだけ）が読まれます
 
 ## テスト
 
 ```bash
-.venv/bin/python -m pytest        # 全 317 件
-.venv/bin/python -m ruff check .  # 静的チェック
+.venv/bin/pip install -r requirements-dev.txt  # pytest と ruff を入れる
+.venv/bin/python -m pytest                     # 全 317 件
+.venv/bin/python -m ruff check .               # 静的チェック
 ```
 
 ## 依存関係
@@ -59,8 +82,8 @@ python3 -m venv .venv
 | Python 3.11+ | 実行環境 |
 | streamlit | UI |
 | pandas | 早見表・成績の表とグラフ |
-| pytest | テスト（開発時のみ） |
-| ruff | Lint（開発時のみ） |
+| pytest | テスト（開発時のみ・`requirements-dev.txt`） |
+| ruff | Lint（開発時のみ・`requirements-dev.txt`） |
 
 外部 API・データベース・認証は一切使いません。回路図・図解イラストは依存ライブラリなしの
 自前 SVG（`tanin/ui/_common.py`）で、`currentColor` を使うのでテーマを変えても見えます。
