@@ -29,6 +29,23 @@ def _parallel(values: tuple[Fraction, ...]) -> Fraction:
 def _expected(question: Question) -> Fraction:
     g: dict[str, Any] = question.given
     pattern = question.pattern
+    if pattern in ("even_pick", "odd_pick"):
+        return g["answer"]
+    if pattern == "next_even_odd":
+        start = int(g["start"])
+        want_even = int(g["want_even"]) == 1
+        number = start + 1
+        while number % 2 != (0 if want_even else 1):
+            number += 1
+        return Fraction(number)
+    if pattern == "count_even_odd":
+        want_even = int(g["want_even"]) == 1
+        remainder = 0 if want_even else 1
+        return Fraction(
+            sum(1 for n in range(int(g["start"]), int(g["end"]) + 1) if n % 2 == remainder)
+        )
+    if pattern in ("multiply_single", "multiply_double", "multiply_decimal"):
+        return g["a"] * g["b"]
     if pattern == "division_exact" or pattern == "division_decimal":
         return g["a"] / g["b"]
     if pattern == "division_by_decimal":
@@ -120,6 +137,13 @@ def test_every_pattern_is_reachable() -> None:
     """定義したすべての出題パターンが実際に生成されること。"""
     seen = {q.pattern for q in _all_questions(80, seed=99)}
     expected = {
+        "even_pick",
+        "odd_pick",
+        "next_even_odd",
+        "count_even_odd",
+        "multiply_single",
+        "multiply_double",
+        "multiply_decimal",
         "division_exact",
         "division_decimal",
         "division_by_decimal",
@@ -168,7 +192,8 @@ def test_same_seed_reproduces_same_question() -> None:
 # 問題の形式
 # --------------------------------------------------------------------------
 def test_questions_have_prompt_unit_and_explanation() -> None:
-    unitless = {"division", "decimal_point"}  # わり算・小数点は単位のない計算問題
+    # わり算・かけ算・小数点・偶数奇数は、単位のない計算問題
+    unitless = {"division", "decimal_point", "multiplication", "even_odd"}
     for q in _all_questions(10, seed=3):
         assert q.prompt.strip()
         assert q.explanation.strip()
@@ -417,4 +442,90 @@ def test_thirty_questions_in_a_row_are_all_clean() -> None:
     assert len(questions) == 30
     for q in questions:
         assert is_clean(q.answer, MAX_DECIMALS.get(q.category, 2))
+        assert q.answer == _expected(q)
+
+
+# --------------------------------------------------------------------------
+# 学習の順番（ロードマップ）
+# --------------------------------------------------------------------------
+def test_learning_steps_are_ordered_and_cover_every_category() -> None:
+    steps = quiz.LEARNING_STEPS
+    assert [s.order for s in steps] == list(range(1, len(steps) + 1))
+    assert {s.category for s in steps} == set(quiz.CATEGORY_KEYS), "全カテゴリが順番に入っていること"
+    assert len({s.category for s in steps}) == len(steps), "同じカテゴリが2回出てこないこと"
+    for step in steps:
+        assert step.category in quiz.CATEGORY_KEYS
+        assert step.difficulty in quiz.DIFFICULTIES
+        assert step.title.strip() and step.goal.strip()
+
+
+def test_learning_steps_start_with_arithmetic_then_science() -> None:
+    """やさしい算数から始まり、あとに理科がくること。"""
+    order = [s.category for s in quiz.LEARNING_STEPS]
+    assert order[:5] == ["even_odd", "multiplication", "division", "decimal_point", "unit_convert"]
+    assert order.index("ohm_basic") < order.index("series") < order.index("combined")
+
+
+def test_every_learning_step_can_generate_questions() -> None:
+    rng = random.Random(41)
+    for step in quiz.LEARNING_STEPS:
+        question = generate_question(step.category, step.difficulty, rng)
+        assert question.category == step.category
+        assert question.difficulty == step.difficulty
+        assert is_clean(question.answer, MAX_DECIMALS.get(question.category, 2))
+
+
+# --------------------------------------------------------------------------
+# 偶数と奇数
+# --------------------------------------------------------------------------
+def test_even_odd_choices_have_exactly_one_correct_parity() -> None:
+    rng = random.Random(42)
+    checked = 0
+    for _ in range(120):
+        q = generate_question("even_odd", rng.choice(list(quiz.DIFFICULTIES)), rng)
+        if q.pattern not in ("even_pick", "odd_pick"):
+            continue
+        checked += 1
+        assert q.kind == "choice"
+        numbers = [int(Fraction(text)) for text in q.choices]
+        evens = [n for n in numbers if n % 2 == 0]
+        if q.pattern == "even_pick":
+            assert len(evens) == 1, f"偶数がちょうど1つでない: {q.choices}"
+            assert int(q.answer) % 2 == 0
+        else:
+            assert len(evens) == 3, f"奇数がちょうど1つでない: {q.choices}"
+            assert int(q.answer) % 2 == 1
+        assert q.choices[q.answer_index] == q.answer_text
+    assert checked > 10
+
+
+def test_next_even_odd_answer_has_the_right_parity() -> None:
+    rng = random.Random(43)
+    for _ in range(60):
+        q = generate_question("even_odd", "normal", rng)
+        if q.pattern != "next_even_odd":
+            continue
+        start = int(q.given["start"])
+        want_even = int(q.given["want_even"]) == 1
+        answer = int(q.answer)
+        assert answer > start
+        assert answer % 2 == (0 if want_even else 1)
+        assert answer - start <= 2, "いちばん小さい数になっていること"
+
+
+# --------------------------------------------------------------------------
+# かけ算の筆算
+# --------------------------------------------------------------------------
+def test_multiplication_walkthrough_carries_correctly() -> None:
+    text = quiz._multiplication_walkthrough(248, 8)  # 1984
+    assert "一の位" in text and "十の位" in text and "百の位" in text
+    assert "くり上げる" in text
+    assert "**4** を書く" in text  # 8 × 8 = 64 の一の位
+
+
+def test_multiplication_answers_match_the_product() -> None:
+    rng = random.Random(44)
+    for _ in range(80):
+        q = generate_question("multiplication", rng.choice(list(quiz.DIFFICULTIES)), rng)
+        assert q.answer == q.given["a"] * q.given["b"]
         assert q.answer == _expected(q)

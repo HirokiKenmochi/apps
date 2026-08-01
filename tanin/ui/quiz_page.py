@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import random
+import re
 import time
 
 import streamlit as st
@@ -65,6 +66,42 @@ def _next_question() -> None:
     )
 
 
+def _start_step(step: quiz.LearningStep) -> None:
+    """学習の順番のボタンから、そのステップの問題をすぐ出す。"""
+    st.session_state["quiz_categories"] = [step.category]
+    st.session_state["quiz_difficulty"] = step.difficulty
+    st.session_state["quiz_mode"] = "practice"
+    st.session_state["current_step"] = step.order
+    _next_question()
+
+
+def _render_roadmap() -> None:
+    """学習の順番。タップするとそのステップの問題がすぐ出る。"""
+    attempts = st.session_state["attempts"]
+    stats = {s.category: s for s in history.by_category(attempts)}
+    current = st.session_state.get("current_step")
+    started = st.session_state["quiz_current"] is not None
+
+    with st.expander("学習の順番（タップでその問題へ）", expanded=not started):
+        st.caption(
+            f"上から順にやると、むりなく進めます。各ステップ {quiz.STEP_GOAL_CORRECT} 問正解で「できた」！"
+        )
+        for step in quiz.LEARNING_STEPS:
+            stat = stats.get(step.category)
+            correct = stat.correct if stat else 0
+            done = correct >= quiz.STEP_GOAL_CORRECT
+            mark = "✅" if done else ("▶️" if step.order == current else f"{step.order}.")
+            st.button(
+                f"{mark} {step.title}",
+                key=f"step_{step.order}",
+                on_click=_start_step,
+                args=(step,),
+                use_container_width=True,
+            )
+            progress = f"正解 {correct} / {quiz.STEP_GOAL_CORRECT}" if correct else "まだ"
+            st.caption(f"{step.goal}　（{quiz.DIFFICULTY_LABELS[step.difficulty]}・{progress}）")
+
+
 def _start_challenge() -> None:
     st.session_state["quiz_mode"] = "challenge"
     st.session_state["challenge_index"] = 0
@@ -109,7 +146,7 @@ def _submit(question: quiz.Question) -> None:
 
 
 def _render_settings() -> None:
-    with st.expander("出題の設定", expanded=st.session_state["quiz_current"] is None):
+    with st.expander("出題の設定（自分で選ぶ）", expanded=False):
         st.multiselect(
             "出題カテゴリ（複数選べます）",
             options=list(quiz.CATEGORY_KEYS),
@@ -152,7 +189,9 @@ def _render_question(question: quiz.Question) -> None:
         st.progress(done / CHALLENGE_COUNT, text=f"{done + 1} 問目 / {CHALLENGE_COUNT}")
 
     st.caption(f"{quiz.category_label(question.category)} ・ {quiz.DIFFICULTY_LABELS[question.difficulty]}")
-    st.markdown(f'<div class="tanin-question">{question.prompt}</div>', unsafe_allow_html=True)
+    # 生の HTML の中では markdown が解釈されないので、**強調** だけ自前で <strong> に直す
+    prompt_html = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", question.prompt)
+    st.markdown(f'<div class="tanin-question">{prompt_html}</div>', unsafe_allow_html=True)
     render_circuit(question.circuit)
 
     grade = st.session_state["quiz_grade"]
@@ -198,6 +237,7 @@ def _render_question(question: quiz.Question) -> None:
 
 def render() -> None:
     st.subheader("練習問題")
+    _render_roadmap()
     _render_settings()
 
     mode = st.session_state["quiz_mode"]

@@ -35,7 +35,10 @@ __all__ = [
     "TOLERANCE",
     "Category",
     "Grade",
+    "LEARNING_STEPS",
+    "LearningStep",
     "Question",
+    "STEP_GOAL_CORRECT",
     "category_label",
     "generate_question",
     "generate_quiz",
@@ -62,6 +65,8 @@ class Category:
 
 
 CATEGORIES: tuple[Category, ...] = (
+    Category("even_odd", "偶数と奇数", "2でわり切れる数の見分け方（小学生向け）"),
+    Category("multiplication", "かけ算の筆算", "整数・小数のかけ算（小学生向け）"),
     Category("division", "わり算の筆算", "整数・小数のわり算（小学生向け）"),
     Category("decimal_point", "小数点の動かし方", "10倍・100倍・1000倍と、10・100・1000でわる計算"),
     Category("unit_convert", "単位の変換", "cm と m、g と kg、mL と L、分と秒など（小学生向け）"),
@@ -80,6 +85,35 @@ DIFFICULTY_LABELS: dict[str, str] = {
     "normal": "ふつう",
     "hard": "むずかしい",
 }
+
+
+@dataclass(frozen=True)
+class LearningStep:
+    """学習の順番（やさしい順）。UI はこの順にボタンを並べる。"""
+
+    order: int
+    title: str
+    category: str
+    difficulty: str
+    goal: str
+
+
+LEARNING_STEPS: tuple[LearningStep, ...] = (
+    LearningStep(1, "偶数と奇数を見分ける", "even_odd", "easy", "一の位を見れば、2 でわり切れるかわかる"),
+    LearningStep(2, "かけ算の筆算", "multiplication", "easy", "一の位から順に、くり上がりに気をつける"),
+    LearningStep(3, "わり算の筆算", "division", "easy", "上の位から「たてる・かける・ひく・おろす」"),
+    LearningStep(4, "小数点の動かし方", "decimal_point", "easy", "10倍・100倍・1000倍で小数点が動く"),
+    LearningStep(5, "単位の変換", "unit_convert", "easy", "cm と m、g と kg、mL と L、分と秒"),
+    LearningStep(6, "オームの法則", "ohm_basic", "easy", "三角形で V＝R×I を使えるようにする"),
+    LearningStep(7, "mA・kΩ の計算", "unit_calc", "normal", "単位をそろえてから計算する"),
+    LearningStep(8, "直列回路", "series", "normal", "合成抵抗は足し算。電流はどこでも同じ"),
+    LearningStep(9, "並列回路", "parallel", "normal", "どの道にも同じ電圧。電流は分かれる"),
+    LearningStep(10, "合成抵抗（直列＋並列）", "combined", "normal", "まとめられるところからまとめる"),
+    LearningStep(11, "電力・電力量・熱量", "power", "normal", "P＝V×I、熱量＝P×時間（秒）"),
+)
+
+STEP_GOAL_CORRECT = 5
+"""1 つのステップを「できた」とみなす正解数。"""
 
 
 def category_label(key: str) -> str:
@@ -566,6 +600,7 @@ def _build(
     distractors: Sequence[Fraction] = (),
     circuit: dict[str, Any] | None = None,
     force_numeric: bool = False,
+    force_choice: bool = False,
     max_decimals: int = 2,
 ) -> Question | None:
     """答えがきれいなら Question を作る。そうでなければ None（＝再抽選）。"""
@@ -583,11 +618,13 @@ def _build(
         "given": given,
         "circuit": circuit,
     }
-    if not force_numeric and rng.random() < 0.5:
+    if force_choice or (not force_numeric and rng.random() < 0.5):
         built = _choices(rng, answer, distractors, unit)
         if built is not None:
             texts, index = built
             return Question(**base, kind="choice", choices=texts, answer_index=index)
+        if force_choice:  # 4 択にできない組み合わせは再抽選する
+            return None
     return Question(**base, kind="numeric")
 
 
@@ -1059,6 +1096,255 @@ def _p_power_heat(rng: random.Random, difficulty: str) -> Question | None:
 
 
 # --------------------------------------------------------------------------
+# 出題パターン：偶数と奇数（小学生向け）
+# --------------------------------------------------------------------------
+_EVEN_ODD_RANGES: dict[str, tuple[int, int]] = {
+    "easy": (10, 99),
+    "normal": (100, 999),
+    "hard": (1000, 9999),
+}
+
+_EVEN_ODD_RULE = (
+    "**偶数**は 2 でわり切れる数。一の位が **0・2・4・6・8**\n\n"
+    "**奇数**は 2 でわると 1 あまる数。一の位が **1・3・5・7・9**"
+)
+
+
+def _pick_even(rng: random.Random, low: int, high: int) -> int:
+    return rng.randrange(low + low % 2, high + 1, 2)
+
+
+def _pick_odd(rng: random.Random, low: int, high: int) -> int:
+    return rng.randrange(low + 1 - low % 2, high + 1, 2)
+
+
+def _p_even_pick(rng: random.Random, difficulty: str) -> Question | None:
+    low, high = _EVEN_ODD_RANGES[difficulty]
+    answer = _pick_even(rng, low, high)
+    others: list[Fraction] = []
+    while len(others) < 3:
+        candidate = Fraction(_pick_odd(rng, low, high))
+        if candidate not in others:
+            others.append(candidate)
+    return _build(
+        rng,
+        category="even_odd",
+        difficulty=difficulty,
+        pattern="even_pick",
+        prompt="つぎの中で「偶数（ぐうすう）」はどれですか。",
+        answer=Fraction(answer),
+        unit="",
+        explanation=_steps(
+            _EVEN_ODD_RULE,
+            f"{answer} の一の位は **{answer % 10}** → 2 でわり切れるので **偶数**",
+            "ほかの数は一の位が 1・3・5・7・9 なので奇数だよ。",
+        ),
+        given={"answer": Fraction(answer), "kind": "even"},
+        distractors=others,
+        force_choice=True,
+    )
+
+
+def _p_odd_pick(rng: random.Random, difficulty: str) -> Question | None:
+    low, high = _EVEN_ODD_RANGES[difficulty]
+    answer = _pick_odd(rng, low, high)
+    others: list[Fraction] = []
+    while len(others) < 3:
+        candidate = Fraction(_pick_even(rng, low, high))
+        if candidate not in others:
+            others.append(candidate)
+    return _build(
+        rng,
+        category="even_odd",
+        difficulty=difficulty,
+        pattern="odd_pick",
+        prompt="つぎの中で「奇数（きすう）」はどれですか。",
+        answer=Fraction(answer),
+        unit="",
+        explanation=_steps(
+            _EVEN_ODD_RULE,
+            f"{answer} の一の位は **{answer % 10}** → 2 でわると 1 あまるので **奇数**",
+            "ほかの数は一の位が 0・2・4・6・8 なので偶数だよ。",
+        ),
+        given={"answer": Fraction(answer), "kind": "odd"},
+        distractors=others,
+        force_choice=True,
+    )
+
+
+def _p_next_even_odd(rng: random.Random, difficulty: str) -> Question | None:
+    low, high = _EVEN_ODD_RANGES[difficulty]
+    want_even = rng.random() < 0.5
+    start = rng.randrange(low, high)
+    answer = start + 1
+    if answer % 2 != (0 if want_even else 1):
+        answer += 1
+    word = "偶数" if want_even else "奇数"
+    return _build(
+        rng,
+        category="even_odd",
+        difficulty=difficulty,
+        pattern="next_even_odd",
+        prompt=f"{start} より大きい数のうち、いちばん小さい「{word}」はいくつですか。",
+        answer=Fraction(answer),
+        unit="",
+        explanation=_steps(
+            _EVEN_ODD_RULE,
+            f"① {start} の次の数から順に見ていく：{start + 1}、{start + 2} …",
+            f"② 一の位が {'0・2・4・6・8' if want_even else '1・3・5・7・9'} になる"
+            f"いちばん小さい数は **{answer}**",
+        ),
+        given={"start": Fraction(start), "want_even": Fraction(1 if want_even else 0)},
+        distractors=[Fraction(answer + 1), Fraction(answer - 1), Fraction(answer + 2)],
+    )
+
+
+def _p_count_even_odd(rng: random.Random, difficulty: str) -> Question | None:
+    width = {"easy": 10, "normal": 20, "hard": 50}[difficulty]
+    start = rng.randrange(1, 60)
+    end = start + width
+    want_even = rng.random() < 0.5
+    remainder = 0 if want_even else 1
+    numbers = [n for n in range(start, end + 1) if n % 2 == remainder]
+    count = len(numbers)
+    first, last = numbers[0], numbers[-1]
+    word = "偶数" if want_even else "奇数"
+    return _build(
+        rng,
+        category="even_odd",
+        difficulty=difficulty,
+        pattern="count_even_odd",
+        prompt=f"{start} から {end} までの中に「{word}」はいくつありますか。",
+        answer=Fraction(count),
+        unit="こ",
+        explanation=_steps(
+            _EVEN_ODD_RULE,
+            f"① この中でいちばん小さい{word}は **{first}**、いちばん大きい{word}は **{last}**",
+            f"② {word}は 2 とびにならぶので、（{last} − {first}）÷ 2 ＋ 1 で数えられる",
+            f"③ （{last - first}）÷ 2 ＋ 1 = **{count} こ**",
+        ),
+        given={"start": Fraction(start), "end": Fraction(end), "want_even": Fraction(1 if want_even else 0)},
+        distractors=[Fraction(count + 1), Fraction(count - 1), Fraction(end - start + 1)],
+    )
+
+
+# --------------------------------------------------------------------------
+# 出題パターン：かけ算の筆算（小学生向け）
+# --------------------------------------------------------------------------
+def _multiplication_walkthrough(a: int, b: int) -> str:
+    """1 けたの数をかける筆算を、一の位から順に説明する。"""
+    lines: list[str] = []
+    carry = 0
+    for index, char in enumerate(reversed(str(a))):
+        digit = int(char)
+        carried_in = carry
+        product = digit * b + carried_in
+        keep, carry = product % 10, product // 10
+        text = f"- {_place_name(index)}：{b} × {digit} = {digit * b}"
+        if carried_in:
+            text += f"、くり上がりの {carried_in} をたして {product}"
+        text += f" → **{keep}** を書く"
+        if carry:
+            text += f"、{carry} をくり上げる"
+        lines.append(text)
+    if carry:
+        lines.append(f"- 最後にくり上がった **{carry}** をそのまま書く")
+    return "\n".join(lines)
+
+
+_MULT_SMALL: dict[str, tuple[int, int]] = {"easy": (12, 99), "normal": (23, 499), "hard": (123, 999)}
+_MULT_ONE_DIGIT: dict[str, tuple[int, ...]] = {
+    "easy": (2, 3, 4, 5),
+    "normal": (3, 4, 6, 7, 8, 9),
+    "hard": (6, 7, 8, 9),
+}
+
+
+def _p_multiply_single(rng: random.Random, difficulty: str) -> Question | None:
+    low, high = _MULT_SMALL[difficulty]
+    a = rng.randrange(low, high + 1)
+    b = rng.choice(_MULT_ONE_DIGIT[difficulty])
+    answer = Fraction(a * b)
+    return _build(
+        rng,
+        category="multiplication",
+        difficulty=difficulty,
+        pattern="multiply_single",
+        prompt=f"{a} × {b} を筆算で計算しましょう。答えはいくつですか。",
+        answer=answer,
+        unit="",
+        explanation=_steps(
+            f"① {a} × {b} を、一の位から順に計算する。",
+            _multiplication_walkthrough(a, b),
+            f"② 答えは **{a * b}**",
+            "ポイント：くり上がった数は、次の位のかけ算のあとに**たす**よ。",
+        ),
+        given={"a": Fraction(a), "b": Fraction(b)},
+        distractors=[Fraction(a + b), Fraction(a * b + 10), Fraction(a * b) / 10],
+    )
+
+
+def _p_multiply_double(rng: random.Random, difficulty: str) -> Question | None:
+    if difficulty == "easy":
+        return None
+    a = rng.randrange(12, 100)
+    b = rng.randrange(12, 100 if difficulty == "hard" else 50)
+    ones, tens = b % 10, (b // 10) * 10
+    answer = Fraction(a * b)
+    return _build(
+        rng,
+        category="multiplication",
+        difficulty=difficulty,
+        pattern="multiply_double",
+        prompt=f"{a} × {b} を筆算で計算しましょう。答えはいくつですか。",
+        answer=answer,
+        unit="",
+        explanation=_steps(
+            f"① まず一の位をかける：{a} × {ones} = **{a * ones}**",
+            f"② つぎに十の位をかける：{a} × {tens} = **{a * tens}**（0 を 1 つずらして書く）",
+            f"③ 2 つを足す：{a * ones} + {a * tens} = **{a * b}**",
+            "ポイント：2 けたのかけ算は、**一の位のかけ算＋十の位のかけ算**に分けると計算できるよ。",
+        ),
+        given={"a": Fraction(a), "b": Fraction(b)},
+        distractors=[Fraction(a * ones), Fraction(a * tens), Fraction(a + b)],
+    )
+
+
+_MULT_DECIMALS: dict[str, tuple[Fraction, ...]] = {
+    "easy": _f("0.5", "1.5", "2.5", "0.2", "0.4"),
+    "normal": _f("0.3", "0.6", "1.2", "2.5", "3.5", "4.5"),
+    "hard": _f("0.15", "0.25", "0.75", "1.25", "2.4", "3.6"),
+}
+
+
+def _p_multiply_decimal(rng: random.Random, difficulty: str) -> Question | None:
+    a = rng.choice(_MULT_DECIMALS[difficulty])
+    b = Fraction(rng.randrange(2, 10)) if rng.random() < 0.6 else rng.choice(_MULT_DECIMALS[difficulty])
+    answer = a * b
+    places = _decimal_places(a) + _decimal_places(b)
+    whole_a = a * 10 ** _decimal_places(a)
+    whole_b = b * 10 ** _decimal_places(b)
+    return _build(
+        rng,
+        category="multiplication",
+        difficulty=difficulty,
+        pattern="multiply_decimal",
+        prompt=f"{fmt(a)} × {fmt(b)} を計算しましょう。答えはいくつですか。",
+        answer=answer,
+        unit="",
+        explanation=_steps(
+            f"① 小数点をわすれて、整数どうしでかける：{fmt(whole_a)} × {fmt(whole_b)} = "
+            f"**{fmt(whole_a * whole_b)}**",
+            f"② 小数点より下のけた数をたす：{fmt(a)} は {_decimal_places(a)} けた、"
+            f"{fmt(b)} は {_decimal_places(b)} けた → 合わせて **{places} けた**",
+            f"③ 答えの小数点を左に {places} つ動かす：{fmt(whole_a * whole_b)} → **{fmt(answer)}**",
+        ),
+        given={"a": a, "b": b},
+        distractors=[whole_a * whole_b, answer * 10, answer / 10],
+    )
+
+
+# --------------------------------------------------------------------------
 # 出題パターン：わり算の筆算（小学生向け）
 # --------------------------------------------------------------------------
 _PLACE_NAMES: dict[int, str] = {
@@ -1420,6 +1706,8 @@ def _p_unit_time(rng: random.Random, difficulty: str) -> Question | None:
 
 
 _PATTERNS: dict[str, tuple[Pattern, ...]] = {
+    "even_odd": (_p_even_pick, _p_odd_pick, _p_next_even_odd, _p_count_even_odd),
+    "multiplication": (_p_multiply_single, _p_multiply_double, _p_multiply_decimal),
     "division": (_p_division_exact, _p_division_decimal, _p_division_by_decimal),
     "decimal_point": (_p_decimal_multiply, _p_decimal_divide, _p_decimal_factor),
     "unit_convert": (_p_unit_metric, _p_unit_time),
@@ -1443,7 +1731,45 @@ def _fallback(rng: random.Random, category: str, difficulty: str) -> Question:
     r = rng.choice([2, 4, 5, 10, 20, 25, 50])
     i = rng.choice([1, 2, 3, 5])
     n = rng.choice([2, 3])
-    if category == "division":
+    if category == "even_odd":
+        answer = rng.choice([12, 24, 36, 48])
+        others = [Fraction(answer + 1), Fraction(answer + 3), Fraction(answer - 1)]
+        question = _build(
+            rng,
+            category=category,
+            difficulty=difficulty,
+            pattern="even_pick",
+            prompt="つぎの中で「偶数（ぐうすう）」はどれですか。",
+            answer=Fraction(answer),
+            unit="",
+            explanation=_steps(
+                _EVEN_ODD_RULE,
+                f"{answer} の一の位は **{answer % 10}** → 2 でわり切れるので **偶数**",
+            ),
+            given={"answer": Fraction(answer), "kind": "even"},
+            distractors=others,
+            force_choice=True,
+        )
+    elif category == "multiplication":
+        a = rng.choice([12, 23, 34, 45])
+        b = rng.choice([2, 3, 4])
+        question = _build(
+            rng,
+            category=category,
+            difficulty=difficulty,
+            pattern="multiply_single",
+            prompt=f"{a} × {b} を筆算で計算しましょう。答えはいくつですか。",
+            answer=Fraction(a * b),
+            unit="",
+            explanation=_steps(
+                f"① {a} × {b} を、一の位から順に計算する。",
+                _multiplication_walkthrough(a, b),
+                f"② 答えは **{a * b}**",
+            ),
+            given={"a": Fraction(a), "b": Fraction(b)},
+            distractors=[Fraction(a + b), Fraction(a * b + 10), Fraction(a * b) / 10],
+        )
+    elif category == "division":
         divisor = rng.choice([2, 3, 4, 5])
         quotient = rng.choice([12, 21, 32, 41])
         dividend = divisor * quotient

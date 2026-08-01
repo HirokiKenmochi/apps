@@ -121,6 +121,7 @@ def init_state() -> None:
         "quiz_categories": ["ohm_basic"],
         "quiz_difficulty": "easy",
         "quiz_mode": "practice",
+        "current_step": None,
         "quiz_current": None,
         "quiz_grade": None,
         "quiz_serial": 0,
