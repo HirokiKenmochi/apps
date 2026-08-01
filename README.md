@@ -13,6 +13,15 @@
 
 ## 起動方法
 
+### はじめて使うとき（クローン）
+
+```bash
+git clone https://github.com/HirokiKenmochi/apps.git
+cd apps
+```
+
+すでにこのPCにある場合は `cd ~/projects/tanin` で移動します。
+
 ### uv を使う場合
 
 ```bash
