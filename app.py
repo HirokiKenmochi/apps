@@ -6,12 +6,10 @@
 
 from __future__ import annotations
 
-import streamlit as st
+import sys
+from pathlib import Path
 
-from tanin.ui import converter, quiz_page, reference, stats
-from tanin.ui._common import init_state, inject_css, render_update_button
-from tanin.ui._storage import sync_history
-from tanin.version import current_version
+import streamlit as st
 
 st.set_page_config(
     page_title="TanIn（たんいん）",
@@ -19,6 +17,27 @@ st.set_page_config(
     layout="centered",
     initial_sidebar_state="collapsed",
 )
+
+
+def _source_fingerprint() -> float:
+    """tanin パッケージの中で、いちばん新しいファイルの更新時刻。"""
+    package = Path(__file__).parent / "tanin"
+    return max((path.stat().st_mtime for path in package.rglob("*.py")), default=0.0)
+
+
+# Streamlit Community Cloud は git pull のあと、読み込み済みモジュールをメモリに
+# 残したままスクリプトだけ再実行する。そのままだと、新しく追加した関数が見つからず
+# ImportError でアプリが止まってしまう。ファイルが新しくなっていたら読み込み直す。
+_fingerprint = _source_fingerprint()
+if st.session_state.get("_source_fingerprint") != _fingerprint:
+    for _name in [name for name in sys.modules if name == "tanin" or name.startswith("tanin.")]:
+        del sys.modules[_name]
+    st.session_state["_source_fingerprint"] = _fingerprint
+
+from tanin.ui import converter, quiz_page, reference, stats  # noqa: E402
+from tanin.ui._common import init_state, inject_css, render_update_button  # noqa: E402
+from tanin.ui._storage import sync_history  # noqa: E402
+from tanin.version import current_version  # noqa: E402
 
 inject_css()
 init_state()

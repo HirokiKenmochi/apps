@@ -319,6 +319,12 @@ UI を通さず pytest だけでロジックを検証できます。
 
 ## 既知のメモ
 
+- Streamlit Community Cloud は `git pull` のあと、**読み込み済みモジュールをメモリに
+  残したままメインスクリプトだけ再実行する**。そのため、モジュールに関数を追加した
+  コミットをそのまま反映すると `ImportError` でアプリが止まることがある。
+  `app.py` の先頭で `tanin/**.py` の更新時刻を見て、変わっていたら `sys.modules` から
+  外して読み込み直すようにして回避している（2026-08-02 に実際に踏んだ）。
+
 - 回路図は `st.html` ではなく `st.markdown(..., unsafe_allow_html=True)` で埋め込んでいます。
   `st.html` は DOMPurify の HTML プロファイルで SVG 要素ごと除去してしまうためです。
 - `use_container_width` は Streamlit 1.60 で非推奨（サーバーログに警告が出ます）。
