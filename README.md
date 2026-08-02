@@ -69,11 +69,29 @@ python3 -m venv .venv
   同じ URL を複数人が開いてもデータは混ざりません
 - 依存関係は `requirements.txt`（実行に必要なものだけ）が読まれます
 
+## 公開版へ反映する（管理側の更新 → アプリに反映）
+
+```bash
+./scripts/deploy.sh "変更内容のメモ"
+```
+
+このスクリプトが、テスト → Lint → `static/version.txt` の更新 → コミット → push →
+**公開版が新しいバージョンを返すまで見張る**、まで一気にやります。
+
+- 反映されると `✅ 反映されました！` と表示されます（通常 push の 1〜2 秒後に取り込まれます）
+- 5 分待っても反映されないときは、Streamlit 側で処理が滞っています。表示される手順どおり
+  公開ページ右下の **Manage app → ⋮ → Reboot app** を押せば 1〜2 分で最新版になります
+- 反映されたかは、アプリ画面いちばん下の **「バージョン: …」** でも確認できます
+  （`<アプリのURL>/app/static/version.txt` を開いても同じ値が見られます）
+
+手で push しても自動反映されます（GitHub の webhook が Streamlit に push を通知します）。
+スクリプトは「反映されたことの確認」までやってくれる点が違いです。
+
 ## テスト
 
 ```bash
 .venv/bin/pip install -r requirements-dev.txt  # pytest と ruff を入れる
-.venv/bin/python -m pytest                     # 全 336 件
+.venv/bin/python -m pytest                     # 全 340 件
 .venv/bin/python -m ruff check .               # 静的チェック
 ```
 
@@ -191,7 +209,10 @@ python3 -m venv .venv
 
 ```
 app.py                  # Streamlit エントリポイント（ページ切り替えのみ）
-.streamlit/config.toml  # テーマ設定（背景をライトに固定）
+.streamlit/config.toml  # テーマ設定（背景をライト固定）と static 配信の設定
+static/version.txt      # デプロイ確認用（deploy.sh が書き換える）
+scripts/deploy.sh       # テスト → push → 公開版に反映されたか確認
+tanin/version.py        # いま動いているバージョンを調べる（Streamlit 非依存）
 tanin/
   units.py              # 単位の定義と換算ロジック（Streamlit 非依存）
   ohm.py                # オームの法則・回路計算ロジック（Streamlit 非依存）

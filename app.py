@@ -10,6 +10,7 @@ import streamlit as st
 
 from tanin.ui import converter, quiz_page, reference, stats
 from tanin.ui._common import init_state, inject_css
+from tanin.version import current_version
 
 st.set_page_config(
     page_title="TanIn（たんいん）",
@@ -40,3 +41,6 @@ with tab_reference:
 
 with tab_stats:
     stats.render()
+
+# いま動いているのがどのコミットかを小さく出す（push が反映されたかの確認用）
+st.caption(f"バージョン: {current_version().label}")

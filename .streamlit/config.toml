@@ -3,3 +3,8 @@
 # 端末の設定に合わせたい場合は base を "dark" にするか、この [theme] を丸ごと消す。
 [theme]
 base = "light"
+
+# static/ の中身を <アプリのURL>/app/static/… で配信する。
+# デプロイが反映されたかを外から確認するために version.txt を置いている。
+[server]
+enableStaticServing = true
