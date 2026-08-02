@@ -251,6 +251,7 @@ def init_state() -> None:
         "quiz_categories": ["ohm_basic"],
         "quiz_difficulty": "easy",
         "quiz_mode": "practice",
+        "quiz_view": "menu",
         "current_step": None,
         "update_pending": False,
         "reload_now": False,
@@ -593,6 +594,26 @@ def relation_bars_svg() -> str:
         ]
     alt = "電圧を2倍にすると電流も2倍、抵抗を2倍にすると電流は半分になることを示す棒グラフ"
     return _SVG_HEAD.format(height=210, alt=_escape(alt)) + "".join(parts) + _SVG_TAIL
+
+
+def scroll_to_top() -> None:
+    """画面が切り替わったとき、いちばん上まで戻す（アプリらしい画面遷移にする）。"""
+    if not st.session_state.pop("scroll_top", False):
+        return
+    components.html(
+        """
+        <script>
+        (function () {
+            var doc = window.parent.document;
+            var box = doc.querySelector('[data-testid="stMainBlockContainer"]')
+                || doc.querySelector('section.main');
+            if (box) { box.scrollTop = 0; }
+            doc.documentElement.scrollTop = 0;
+        })();
+        </script>
+        """,
+        height=0,
+    )
 
 
 def render_figure(svg: str) -> None:

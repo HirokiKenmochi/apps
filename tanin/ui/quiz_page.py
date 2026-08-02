@@ -9,7 +9,13 @@ import time
 import streamlit as st
 
 from tanin import history, quiz
-from tanin.ui._common import numeric_input, ohm_triangle_svg, render_circuit, render_figure
+from tanin.ui._common import (
+    numeric_input,
+    ohm_triangle_svg,
+    render_circuit,
+    render_figure,
+    scroll_to_top,
+)
 
 CHALLENGE_COUNT = 10
 
@@ -66,40 +72,58 @@ def _next_question() -> None:
     )
 
 
+def _show_question_screen() -> None:
+    """問題の画面へ切り替える（いちばん上までスクロールする）。"""
+    st.session_state["quiz_view"] = "question"
+    st.session_state["scroll_top"] = True
+
+
+def _show_menu_screen() -> None:
+    """学習の順番の画面へもどる。"""
+    st.session_state["quiz_view"] = "menu"
+    st.session_state["scroll_top"] = True
+
+
 def _start_step(step: quiz.LearningStep) -> None:
-    """学習の順番のボタンから、そのステップの問題をすぐ出す。"""
+    """学習の順番のボタンから、そのステップの問題画面へ移る。"""
     st.session_state["quiz_categories"] = [step.category]
     st.session_state["quiz_difficulty"] = step.difficulty
     st.session_state["quiz_mode"] = "practice"
     st.session_state["current_step"] = step.order
     _next_question()
+    _show_question_screen()
+
+
+def _start_practice() -> None:
+    st.session_state["current_step"] = None
+    _next_question()
+    _show_question_screen()
 
 
 def _render_roadmap() -> None:
-    """学習の順番。タップするとそのステップの問題がすぐ出る。"""
+    """学習の順番の一覧。タイトルを押すと問題の画面に切り替わる。"""
     attempts = st.session_state["attempts"]
     stats = {s.category: s for s in history.by_category(attempts)}
     current = st.session_state.get("current_step")
-    started = st.session_state["quiz_current"] is not None
 
-    with st.expander("学習の順番（タップでその問題へ）", expanded=not started):
-        st.caption(
-            f"上から順にやると、むりなく進めます。各ステップ {quiz.STEP_GOAL_CORRECT} 問正解で「できた」！"
+    st.markdown("**学習の順番**（タップするとその問題が始まります）")
+    st.caption(
+        f"上から順にやると、むりなく進めます。各ステップ {quiz.STEP_GOAL_CORRECT} 問正解で「できた」！"
+    )
+    for step in quiz.LEARNING_STEPS:
+        stat = stats.get(step.category)
+        correct = stat.correct if stat else 0
+        done = correct >= quiz.STEP_GOAL_CORRECT
+        mark = "✅" if done else ("▶️" if step.order == current else f"{step.order}.")
+        st.button(
+            f"{mark} {step.title}",
+            key=f"step_{step.order}",
+            on_click=_start_step,
+            args=(step,),
+            use_container_width=True,
         )
-        for step in quiz.LEARNING_STEPS:
-            stat = stats.get(step.category)
-            correct = stat.correct if stat else 0
-            done = correct >= quiz.STEP_GOAL_CORRECT
-            mark = "✅" if done else ("▶️" if step.order == current else f"{step.order}.")
-            st.button(
-                f"{mark} {step.title}",
-                key=f"step_{step.order}",
-                on_click=_start_step,
-                args=(step,),
-                use_container_width=True,
-            )
-            progress = f"正解 {correct} / {quiz.STEP_GOAL_CORRECT}" if correct else "まだ"
-            st.caption(f"{step.goal}　（{quiz.DIFFICULTY_LABELS[step.difficulty]}・{progress}）")
+        progress = f"正解 {correct} / {quiz.STEP_GOAL_CORRECT}" if correct else "まだ"
+        st.caption(f"{step.goal}　（{quiz.DIFFICULTY_LABELS[step.difficulty]}・{progress}）")
 
 
 def _start_challenge() -> None:
@@ -110,12 +134,14 @@ def _start_challenge() -> None:
     st.session_state["challenge_finished"] = False
     st.session_state["challenge_seconds"] = 0.0
     _next_question()
+    _show_question_screen()
 
 
 def _start_review() -> None:
     st.session_state["quiz_mode"] = "review"
     st.session_state["review_queue"] = history.review_questions(st.session_state["attempts"])
     _next_question()
+    _show_question_screen()
 
 
 def _on_mode_change() -> None:
@@ -207,7 +233,7 @@ def _render_question(question: quiz.Question) -> None:
         )
     else:
         numeric_input(
-            f"答え（{question.unit}）",
+            f"答え（{question.unit}）" if question.unit else "答え",
             key=key,
             example="12.5",
             help_text="答えは、小数第2位までのきりのいい数になるよ。",
@@ -235,34 +261,75 @@ def _render_question(question: quiz.Question) -> None:
         st.button("次の問題へ", on_click=_next_question, use_container_width=True)
 
 
-def render() -> None:
-    st.subheader("練習問題")
+def _current_step() -> quiz.LearningStep | None:
+    order = st.session_state.get("current_step")
+    for step in quiz.LEARNING_STEPS:
+        if step.order == order:
+            return step
+    return None
+
+
+def _render_menu() -> None:
+    """学習の順番と、自分で選ぶ設定（＝メニュー画面）。"""
+    if st.session_state["quiz_current"] is not None:
+        st.button(
+            "▶ いまの問題にもどる",
+            on_click=_show_question_screen,
+            use_container_width=True,
+        )
+
     _render_roadmap()
+    st.divider()
     _render_settings()
 
     mode = st.session_state["quiz_mode"]
-    question = st.session_state["quiz_current"]
-
-    if mode == "challenge" and st.session_state["challenge_finished"] and question is None:
-        _render_challenge_result()
-        return
-
-    if question is None:
-        if mode == "challenge":
-            st.write(f"連続 {CHALLENGE_COUNT} 問を解いて、スコアと所要時間を記録しましょう。")
-            st.button("チャレンジを始める", on_click=_start_challenge, use_container_width=True)
-        elif mode == "review":
-            pending = history.review_questions(st.session_state["attempts"])
-            if not pending:
-                st.info("復習リストは空です。間違えた問題がここに貯まります。")
-            else:
-                st.write(f"復習できる問題が {len(pending)} 問あります。")
-                st.button("復習を始める", on_click=_start_review, use_container_width=True)
+    if mode == "challenge":
+        st.write(f"連続 {CHALLENGE_COUNT} 問を解いて、スコアと所要時間を記録しましょう。")
+        st.button("チャレンジを始める", on_click=_start_challenge, use_container_width=True)
+    elif mode == "review":
+        pending = history.review_questions(st.session_state["attempts"])
+        if not pending:
+            st.info("復習リストは空です。間違えた問題がここに貯まります。")
         else:
-            if not st.session_state["quiz_categories"]:
-                st.info("出題カテゴリを 1 つ以上選んでください。")
-            else:
-                st.button("問題を出す", on_click=_next_question, use_container_width=True)
+            st.write(f"復習できる問題が {len(pending)} 問あります。")
+            st.button("復習を始める", on_click=_start_review, use_container_width=True)
+    elif not st.session_state["quiz_categories"]:
+        st.info("出題カテゴリを 1 つ以上選んでください。")
+    else:
+        st.button("えらんだ設定で問題を出す", on_click=_start_practice, use_container_width=True)
+
+
+def _render_question_screen() -> None:
+    """問題だけを表示する画面。"""
+    st.button("← 学習の順番にもどる", on_click=_show_menu_screen, use_container_width=True)
+
+    step = _current_step()
+    if step is not None:
+        attempts = st.session_state["attempts"]
+        stats = {s.category: s for s in history.by_category(attempts)}
+        stat = stats.get(step.category)
+        correct = stat.correct if stat else 0
+        st.markdown(f"**{step.order}. {step.title}**")
+        st.caption(f"{step.goal}　（正解 {correct} / {quiz.STEP_GOAL_CORRECT}）")
+
+    question = st.session_state["quiz_current"]
+    if question is None:
+        if st.session_state["quiz_mode"] == "challenge" and st.session_state["challenge_finished"]:
+            _render_challenge_result()
+        elif st.session_state["quiz_mode"] == "review":
+            st.success("復習リストの問題をすべて解きました！")
+        else:
+            st.info("問題がありません。「学習の順番にもどる」から選んでください。")
         return
 
     _render_question(question)
+
+
+def render() -> None:
+    st.subheader("練習問題")
+    scroll_to_top()
+
+    if st.session_state.get("quiz_view") == "question":
+        _render_question_screen()
+    else:
+        _render_menu()
