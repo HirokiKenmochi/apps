@@ -82,7 +82,8 @@ python3 -m venv .venv
 - 5 分待っても反映されないときは、Streamlit 側で処理が滞っています。表示される手順どおり
   公開ページ右下の **Manage app → ⋮ → Reboot app** を押せば 1〜2 分で最新版になります
 - 反映されたかは、アプリ画面いちばん下の **「バージョン: …」** でも確認できます
-  （`<アプリのURL>/app/static/version.txt` を開いても同じ値が見られます）
+  （`<アプリのURL>/~/+/app/static/version.txt` を開いても同じ値が見られます。
+  Streamlit Community Cloud はアプリを `/~/+/` の下で配信するため、このパスになります）
 
 手で push しても自動反映されます（GitHub の webhook が Streamlit に push を通知します）。
 スクリプトは「反映されたことの確認」までやってくれる点が違いです。

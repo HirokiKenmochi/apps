@@ -16,7 +16,10 @@
 set -euo pipefail
 
 APP_URL="${APP_URL:-https://tanin-app.streamlit.app}"
-VERSION_URL="${APP_URL}/app/static/version.txt"
+# Streamlit Community Cloud はアプリを /~/+/ の下で配信する。
+# 自前で streamlit run しているときは /app/static/... なので、両方を見に行く。
+VERSION_URL="${APP_URL}/~/+/app/static/version.txt"
+VERSION_URL_ALT="${APP_URL}/app/static/version.txt"
 WAIT_SECONDS="${WAIT_SECONDS:-300}"
 DRY_RUN="${DRY_RUN:-}"
 
@@ -43,11 +46,7 @@ fi
 
 echo "▶ コミットして push"
 git add -A
-git commit -q -m "${message}" || echo "  （コミットする変更はありませんでした）"
-commit="$(git rev-parse --short HEAD)"
-printf 'build=%s\ncommit=%s\n' "${build}" "${commit}" > static/version.txt
-git add static/version.txt
-git commit -q --amend --no-edit
+git commit -q -m "${message}" || echo "  コミットする変更はありませんでした"
 commit="$(git rev-parse --short HEAD)"
 git push origin main
 
@@ -56,6 +55,9 @@ echo "  ${VERSION_URL}"
 deadline=$(( $(date +%s) + WAIT_SECONDS ))
 while [ "$(date +%s)" -lt "${deadline}" ]; do
     live="$(curl -fsS --max-time 10 "${VERSION_URL}" 2>/dev/null | grep '^build=' || true)"
+    if [ -z "${live}" ]; then
+        live="$(curl -fsS --max-time 10 "${VERSION_URL_ALT}" 2>/dev/null | grep '^build=' || true)"
+    fi
     if [ "${live}" = "build=${build}" ]; then
         echo ""
         echo "✅ 反映されました  ${APP_URL}  コミット ${commit}"
