@@ -100,6 +100,22 @@ button, [role="tab"], [role="radiogroup"] label { user-select: none; }
     }
     [data-testid="stTab"] p { font-size: 0.78rem !important; }
 }
+/* Streamlit や GitHub のマークなど、アプリと関係のない表示を消す
+   （右上の Share・お気に入り・編集・GitHub・⋮ と、上部の装飾バー） */
+[data-testid="stToolbar"],
+[data-testid="stToolbarActions"],
+[data-testid="stDecoration"],
+[data-testid="stStatusWidget"],
+#MainMenu,
+footer {
+    display: none !important;
+}
+header[data-testid="stHeader"] {
+    height: 0 !important;
+    min-height: 0 !important;
+    background: transparent !important;
+}
+
 /* はみ出し防止 */
 img, svg, table, pre, code { max-width: 100%; }
 [data-testid="stMetricValue"] { font-size: 1.5rem; }
