@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from fractions import Fraction
 from typing import Any
+from urllib.parse import quote_plus
 
 from tanin import ohm, units
 from tanin.ohm import fmt
@@ -40,6 +41,8 @@ __all__ = [
     "Question",
     "STEP_GOAL_CORRECT",
     "category_label",
+    "step_for_category",
+    "youtube_link",
     "generate_question",
     "generate_quiz",
     "grade",
@@ -89,31 +92,101 @@ DIFFICULTY_LABELS: dict[str, str] = {
 
 @dataclass(frozen=True)
 class LearningStep:
-    """学習の順番（やさしい順）。UI はこの順にボタンを並べる。"""
+    """学習の順番（やさしい順）。UI はこの順にボタンを並べる。
+
+    ``youtube_query`` は YouTube の検索キーワード。
+    見せたい動画が決まったら ``youtube_url`` に直接 URL を入れると、そちらが優先される。
+    """
 
     order: int
     title: str
     category: str
     difficulty: str
     goal: str
+    youtube_query: str = ""
+    youtube_url: str = ""
 
 
 LEARNING_STEPS: tuple[LearningStep, ...] = (
-    LearningStep(1, "偶数と奇数を見分ける", "even_odd", "easy", "一の位を見れば、2 でわり切れるかわかる"),
-    LearningStep(2, "かけ算の筆算", "multiplication", "easy", "一の位から順に、くり上がりに気をつける"),
-    LearningStep(3, "わり算の筆算", "division", "easy", "上の位から「たてる・かける・ひく・おろす」"),
-    LearningStep(4, "小数点の動かし方", "decimal_point", "easy", "10倍・100倍・1000倍で小数点が動く"),
-    LearningStep(5, "単位の変換", "unit_convert", "easy", "cm と m、g と kg、mL と L、分と秒"),
-    LearningStep(6, "オームの法則", "ohm_basic", "easy", "三角形で V＝R×I を使えるようにする"),
-    LearningStep(7, "mA・kΩ の計算", "unit_calc", "normal", "単位をそろえてから計算する"),
-    LearningStep(8, "直列回路", "series", "normal", "合成抵抗は足し算。電流はどこでも同じ"),
-    LearningStep(9, "並列回路", "parallel", "normal", "どの道にも同じ電圧。電流は分かれる"),
-    LearningStep(10, "合成抵抗（直列＋並列）", "combined", "normal", "まとめられるところからまとめる"),
-    LearningStep(11, "電力・電力量・熱量", "power", "normal", "P＝V×I、熱量＝P×時間（秒）"),
+    LearningStep(
+        1, "偶数と奇数を見分ける", "even_odd", "easy",
+        "一の位を見れば、2 でわり切れるかわかる",
+        youtube_query="偶数 奇数 小学校 算数 わかりやすい",
+    ),
+    LearningStep(
+        2, "かけ算の筆算", "multiplication", "easy",
+        "一の位から順に、くり上がりに気をつける",
+        youtube_query="かけ算 筆算 やり方 小学生",
+    ),
+    LearningStep(
+        3, "わり算の筆算", "division", "easy",
+        "上の位から「たてる・かける・ひく・おろす」",
+        youtube_query="わり算 筆算 やり方 小学生",
+    ),
+    LearningStep(
+        4, "小数点の動かし方", "decimal_point", "easy",
+        "10倍・100倍・1000倍で小数点が動く",
+        youtube_query="小数 10倍 100倍 小数点 動かし方 算数",
+    ),
+    LearningStep(
+        5, "単位の変換", "unit_convert", "easy",
+        "cm と m、g と kg、mL と L、分と秒",
+        youtube_query="単位 換算 mm cm m km 小学生 算数",
+    ),
+    LearningStep(
+        6, "オームの法則", "ohm_basic", "easy",
+        "三角形で V＝R×I を使えるようにする",
+        youtube_query="オームの法則 中学 理科 わかりやすい",
+    ),
+    LearningStep(
+        7, "mA・kΩ の計算", "unit_calc", "normal",
+        "単位をそろえてから計算する",
+        youtube_query="オームの法則 mA kΩ 単位 そろえる 計算",
+    ),
+    LearningStep(
+        8, "直列回路", "series", "normal",
+        "合成抵抗は足し算。電流はどこでも同じ",
+        youtube_query="直列回路 合成抵抗 中学 理科",
+    ),
+    LearningStep(
+        9, "並列回路", "parallel", "normal",
+        "どの道にも同じ電圧。電流は分かれる",
+        youtube_query="並列回路 合成抵抗 中学 理科",
+    ),
+    LearningStep(
+        10, "合成抵抗（直列＋並列）", "combined", "normal",
+        "まとめられるところからまとめる",
+        youtube_query="直列 並列 合成抵抗 計算 中学 理科",
+    ),
+    LearningStep(
+        11, "電力・電力量・熱量", "power", "normal",
+        "P＝V×I、熱量＝P×時間（秒）",
+        youtube_query="電力 電力量 熱量 計算 中学 理科",
+    ),
 )
 
 STEP_GOAL_CORRECT = 5
 """1 つのステップを「できた」とみなす正解数。"""
+
+
+def step_for_category(category: str) -> LearningStep | None:
+    """カテゴリから学習ステップを引く。"""
+    for step in LEARNING_STEPS:
+        if step.category == category:
+            return step
+    return None
+
+
+def youtube_link(step: LearningStep) -> str:
+    """そのステップを学べる YouTube の URL。
+
+    ``youtube_url`` が入っていればその動画へ、無ければ検索結果へ飛ばす
+    （検索リンクなら、動画が消えてもリンク切れにならない）。
+    """
+    if step.youtube_url:
+        return step.youtube_url
+    query = step.youtube_query or step.title
+    return "https://www.youtube.com/results?search_query=" + quote_plus(query)
 
 
 def category_label(key: str) -> str:

@@ -123,7 +123,10 @@ def _render_roadmap() -> None:
             use_container_width=True,
         )
         progress = f"正解 {correct} / {quiz.STEP_GOAL_CORRECT}" if correct else "まだ"
-        st.caption(f"{step.goal}　（{quiz.DIFFICULTY_LABELS[step.difficulty]}・{progress}）")
+        st.caption(
+            f"{step.goal}　（{quiz.DIFFICULTY_LABELS[step.difficulty]}・{progress}）"
+            f"　[▶ YouTubeで学ぶ]({quiz.youtube_link(step)})"
+        )
 
 
 def _start_challenge() -> None:
@@ -283,6 +286,12 @@ def _render_question(question: quiz.Question) -> None:
         if highlight:
             st.markdown(_TRIANGLE_HINT[highlight])
             render_figure(ohm_triangle_svg(highlight))
+        related = quiz.step_for_category(question.category)
+        if related is not None:
+            st.caption(
+                "もっとくわしく → "
+                f"[▶ YouTubeで「{related.title}」を学ぶ]({quiz.youtube_link(related)})"
+            )
 
     if st.session_state["quiz_mode"] == "challenge" and st.session_state["challenge_finished"]:
         _render_challenge_result()
@@ -340,6 +349,11 @@ def _render_question_screen() -> None:
         correct = stat.correct if stat else 0
         st.markdown(f"**{step.order}. {step.title}**")
         st.caption(f"{step.goal}　（正解 {correct} / {quiz.STEP_GOAL_CORRECT}）")
+        st.link_button(
+            "▶ YouTubeで学ぶ",
+            quiz.youtube_link(step),
+            use_container_width=True,
+        )
 
     question = st.session_state["quiz_current"]
     if question is None:

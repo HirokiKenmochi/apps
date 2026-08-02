@@ -529,3 +529,29 @@ def test_multiplication_answers_match_the_product() -> None:
         q = generate_question("multiplication", rng.choice(list(quiz.DIFFICULTIES)), rng)
         assert q.answer == q.given["a"] * q.given["b"]
         assert q.answer == _expected(q)
+
+
+# --------------------------------------------------------------------------
+# YouTube リンク
+# --------------------------------------------------------------------------
+def test_every_step_has_a_youtube_link() -> None:
+    for step in quiz.LEARNING_STEPS:
+        assert step.youtube_query, f"{step.title} に検索キーワードがない"
+        url = quiz.youtube_link(step)
+        assert url.startswith("https://www.youtube.com/"), url
+        assert " " not in url  # URL エンコード済み
+
+
+def test_youtube_link_prefers_a_fixed_url() -> None:
+    """動画 URL を入れたときは、検索ではなくその動画に飛ぶ。"""
+    step = quiz.LearningStep(
+        1, "テスト", "division", "easy", "目標",
+        youtube_query="わり算", youtube_url="https://www.youtube.com/watch?v=abc123",
+    )
+    assert quiz.youtube_link(step) == "https://www.youtube.com/watch?v=abc123"
+
+
+def test_step_for_category() -> None:
+    for step in quiz.LEARNING_STEPS:
+        assert quiz.step_for_category(step.category) is step
+    assert quiz.step_for_category("magnetism") is None
