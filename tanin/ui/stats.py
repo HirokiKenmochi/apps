@@ -7,13 +7,13 @@ import streamlit as st
 
 from tanin import history
 from tanin.quiz import DIFFICULTY_LABELS
+from tanin.ui._storage import clear_saved_history
 
 _HISTORY_FILENAME = "tanin_history.json"
 
 
 def _clear_history() -> None:
-    st.session_state["attempts"] = []
-    st.session_state["review_queue"] = []
+    clear_saved_history()  # ブラウザに保存したぶんも消す
 
 
 def _start_review() -> None:
@@ -77,7 +77,8 @@ def render() -> None:
     st.divider()
 
     st.markdown("**履歴の保存・復元**")
-    st.caption("履歴はこの端末のブラウザセッションだけに残ります。JSONに書き出して保存できます。")
+    st.caption("履歴はこの端末のブラウザに保存されます（サーバーには送られません）。\n"
+           "別の端末に移すときは、JSONに書き出して読み込んでください。")
     st.download_button(
         "履歴をJSONでダウンロード",
         data=history.to_json(attempts),

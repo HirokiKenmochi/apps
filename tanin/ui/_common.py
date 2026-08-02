@@ -613,9 +613,9 @@ def render_update_button(version_label: str) -> None:
             st.rerun()
         return
 
-    st.warning(
-        "画面を読み込み直します。**この端末の学習履歴は消えます。**\n\n"
-        "残したいときは、先に「成績」タブの「履歴をJSONでダウンロード」を押してください。"
+    st.info(
+        "画面を読み込み直して最新版にします。\n\n"
+        "**学習履歴はこの端末に保存されているので消えません。**"
     )
     yes, no = st.columns(2)
     if yes.button("更新する", use_container_width=True):

@@ -10,6 +10,7 @@ import streamlit as st
 
 from tanin.ui import converter, quiz_page, reference, stats
 from tanin.ui._common import init_state, inject_css, render_update_button
+from tanin.ui._storage import sync_history
 from tanin.version import current_version
 
 st.set_page_config(
@@ -21,6 +22,7 @@ st.set_page_config(
 
 inject_css()
 init_state()
+sync_history()  # ブラウザに保存した学習履歴を読み込む（以降は自動で保存される）
 
 st.title("TanIn（たんいん）")
 st.caption("単位換算とオームの法則を、スマホでもPCでも練習できる理科学習アプリ")

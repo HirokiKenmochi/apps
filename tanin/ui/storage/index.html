@@ -1,0 +1,43 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>tanin storage</title>
+<!--
+  学習履歴をブラウザの localStorage に保存する、目に見えない部品。
+
+  Streamlit のカスタムコンポーネントの約束ごと（postMessage）だけを使っていて、
+  ビルド（npm など）は不要。サーバーには何も送らない。
+
+  - Python から payload（履歴の JSON 文字列）を受け取ったら localStorage に書く
+  - 起動時に localStorage の中身を Python に返す（＝リロードしても続きから使える）
+-->
+<script>
+  var KEY = "tanin.history.v1";
+  var reported = false;
+
+  function send(type, data) {
+    var message = { isStreamlitMessage: true, type: type };
+    for (var name in data) { message[name] = data[name]; }
+    window.parent.postMessage(message, "*");
+  }
+
+  function report() {
+    var stored = "";
+    try { stored = window.localStorage.getItem(KEY) || ""; } catch (e) { stored = ""; }
+    send("streamlit:setComponentValue", { value: stored, dataType: "json" });
+  }
+
+  window.addEventListener("message", function (event) {
+    if (!event.data || event.data.type !== "streamlit:render") { return; }
+    var args = event.data.args || {};
+    if (typeof args.payload === "string") {
+      try {
+        if (args.payload) { window.localStorage.setItem(KEY, args.payload); }
+        else { window.localStorage.removeItem(KEY); }
+      } catch (e) { /* 保存できない設定でも、アプリは動き続ける */ }
+    }
+    if (!reported) { reported = true; report(); }
+  });
+
+  send("streamlit:componentReady", { apiVersion: 1 });
+  send("streamlit:setFrameHeight", { height: 0 });
+</script>
