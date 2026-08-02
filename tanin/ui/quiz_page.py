@@ -150,6 +150,11 @@ def _on_mode_change() -> None:
         st.session_state["review_queue"] = history.review_questions(st.session_state["attempts"])
 
 
+def _pick_choice(index: int) -> None:
+    """4択のボタンを押したとき、その選択肢を選んだ状態にする。"""
+    st.session_state[_answer_key()] = index
+
+
 def _submit(question: quiz.Question) -> None:
     response = st.session_state.get(_answer_key())
     result = quiz.grade(question, response)
@@ -224,13 +229,28 @@ def _render_question(question: quiz.Question) -> None:
     key = _answer_key()
 
     if question.kind == "choice":
-        st.radio(
-            "答えを選んでください",
-            options=list(question.choices),
-            key=key,
-            index=None,
-            disabled=grade is not None,
-        )
+        st.caption("答えを選んでください")
+        selected = st.session_state.get(key)
+        graded = grade is not None
+        for index, text in enumerate(question.choices):
+            label = text
+            if graded and index == question.answer_index:
+                label = f"⭕️ {text}"
+            elif graded and index == selected:
+                label = f"❌ {text}"
+            highlighted = (
+                index == question.answer_index if graded else index == selected
+            )
+            options: dict[str, object] = {
+                "key": f"{key}_option_{index}",
+                "type": "primary" if highlighted else "secondary",
+                "use_container_width": True,
+                "disabled": graded,
+            }
+            if not graded:
+                options["on_click"] = _pick_choice
+                options["args"] = (index,)
+            st.button(label, **options)
     else:
         numeric_input(
             f"答え（{question.unit}）" if question.unit else "答え",
@@ -240,7 +260,16 @@ def _render_question(question: quiz.Question) -> None:
         )
 
     if grade is None:
-        st.button("答え合わせ", on_click=_submit, args=(question,), use_container_width=True)
+        unanswered = question.kind == "choice" and st.session_state.get(key) is None
+        st.button(
+            "答え合わせ",
+            on_click=_submit,
+            args=(question,),
+            use_container_width=True,
+            disabled=unanswered,
+        )
+        if unanswered:
+            st.caption("上のボタンから答えを選ぶと、答え合わせができます。")
         return
 
     if grade.correct:
