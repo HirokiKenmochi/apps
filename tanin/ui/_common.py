@@ -195,6 +195,40 @@ try {
 } catch (e) {
     /* 別ドメインに埋め込まれている場合は何もしない */
 }
+
+// Streamlit Cloud が右下に出すバッジ（閲覧者に表示される Streamlit のマーク）を隠す。
+// アプリの外側のページにある要素なので、いちばん外側の文書に対して処理する。
+function hideHostBadge() {
+    var doc;
+    try { doc = window.top.document.head ? window.top.document : window.parent.document; }
+    catch (e) { return; }
+    if (!doc.getElementById("tanin-hide-badge")) {
+        var style = doc.createElement("style");
+        style.id = "tanin-hide-badge";
+        style.textContent =
+            '[class*="viewerBadge"],[data-testid="viewerBadge"],' +
+            '[class*="_profileContainer"],[class*="_profileImage"],' +
+            '[class*="_viewerBadge"],[class*="_badgeContainer"]' +
+            '{display:none !important;}';
+        (doc.head || doc.documentElement).appendChild(style);
+    }
+    // クラス名は変わることがあるので、右下にある streamlit.io へのリンクも隠す
+    var view = doc.defaultView || window;
+    var width = view.innerWidth;
+    var height = view.innerHeight;
+    doc.querySelectorAll('a[href*="streamlit.io"],a[href*="streamlit.app"]').forEach(function (link) {
+        var target = link.closest("div") || link;
+        var box = target.getBoundingClientRect();
+        var atBottomRight = box.bottom > height - 160 && box.right > width - 260;
+        if (atBottomRight && box.height < 260) { target.style.display = "none"; }
+    });
+}
+try {
+    hideHostBadge();
+    setInterval(hideHostBadge, 1500);
+} catch (e) {
+    /* 隠せない環境でも、アプリはそのまま動く */
+}
 </script>
 """
 
