@@ -201,6 +201,8 @@ def init_state() -> None:
         "quiz_difficulty": "easy",
         "quiz_mode": "practice",
         "current_step": None,
+        "update_pending": False,
+        "reload_now": False,
         "quiz_current": None,
         "quiz_grade": None,
         "quiz_serial": 0,
@@ -573,3 +575,52 @@ def render_circuit(circuit: dict[str, Any] | None) -> None:
     if not svg:
         return
     st.markdown(svg, unsafe_allow_html=True)
+
+
+# --------------------------------------------------------------------------
+# 「最新版に更新」ボタン
+#
+# サーバー側（Streamlit Community Cloud）は push の 1〜2 秒後に自動で最新コードを
+# 取り込む。ただし、すでに開きっぱなしのタブは古い画面のままなので、
+# このボタンでブラウザを読み込み直して最新版にする。
+# --------------------------------------------------------------------------
+_RELOAD_SCRIPT = """
+<script>
+(function () {
+    // Streamlit Cloud ではアプリが iframe の中にあるので、いちばん外側を読み込み直す
+    try { window.top.location.reload(); }
+    catch (e) { window.parent.location.reload(); }
+})();
+</script>
+"""
+
+
+def render_update_button(version_label: str) -> None:
+    """バージョン表示と「最新版に更新」ボタン。押すと画面を読み込み直す。"""
+    if st.session_state.get("reload_now"):
+        st.session_state["reload_now"] = False
+        st.session_state["update_pending"] = False
+        components.html(_RELOAD_SCRIPT, height=0)
+        st.caption("最新版を読み込んでいます…")
+        return
+
+    left, right = st.columns([3, 2])
+    left.caption(f"バージョン: {version_label}")
+
+    if not st.session_state.get("update_pending"):
+        if right.button("⟳ 最新版に更新", use_container_width=True):
+            st.session_state["update_pending"] = True
+            st.rerun()
+        return
+
+    st.warning(
+        "画面を読み込み直します。**この端末の学習履歴は消えます。**\n\n"
+        "残したいときは、先に「成績」タブの「履歴をJSONでダウンロード」を押してください。"
+    )
+    yes, no = st.columns(2)
+    if yes.button("更新する", use_container_width=True):
+        st.session_state["reload_now"] = True
+        st.rerun()
+    if no.button("やめる", use_container_width=True):
+        st.session_state["update_pending"] = False
+        st.rerun()

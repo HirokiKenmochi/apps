@@ -9,7 +9,7 @@ from __future__ import annotations
 import streamlit as st
 
 from tanin.ui import converter, quiz_page, reference, stats
-from tanin.ui._common import init_state, inject_css
+from tanin.ui._common import init_state, inject_css, render_update_button
 from tanin.version import current_version
 
 st.set_page_config(
@@ -42,5 +42,6 @@ with tab_reference:
 with tab_stats:
     stats.render()
 
-# いま動いているのがどのコミットかを小さく出す（push が反映されたかの確認用）
-st.caption(f"バージョン: {current_version().label}")
+# いま動いているバージョンの表示と、開きっぱなしの画面を最新にするボタン
+st.divider()
+render_update_button(current_version().label)
