@@ -48,18 +48,57 @@ div[role="radiogroup"] > label {
     align-items: center;
     padding: 0.1rem 0;
 }
-/* タブは狭い画面では横スクロールさせ、文字が潰れないようにする */
-.stTabs [data-baseweb="tab-list"] {
+/* タブ（Streamlit 1.60 では data-testid で指定する） */
+[data-testid="stTabs"] [role="tablist"] {
     overflow-x: auto;
     gap: 0.15rem;
     scrollbar-width: none;
 }
-.stTabs [data-baseweb="tab-list"]::-webkit-scrollbar { display: none; }
-.stTabs [data-baseweb="tab"] {
+[data-testid="stTabs"] [role="tablist"]::-webkit-scrollbar { display: none; }
+[data-testid="stTab"] {
     min-height: 44px;
     padding-left: 0.6rem;
     padding-right: 0.6rem;
     white-space: nowrap;
+}
+/* タップの青いハイライトを消し、文字の自動拡大も止める（アプリらしい操作感） */
+html { -webkit-text-size-adjust: 100%; }
+* { -webkit-tap-highlight-color: transparent; }
+button, [role="tab"], [role="radiogroup"] label { user-select: none; }
+
+/* ------------------------------------------------------------------ */
+/* スマホ幅では、タブを画面下に固定してアプリのタブバーのようにする      */
+/* 背景色はテーマから読み取った --tanin-bg を使う（色はハードコードしない）*/
+/* ------------------------------------------------------------------ */
+@media (max-width: 640px) {
+    .block-container {
+        padding-top: 0.6rem;
+        padding-bottom: 5.5rem;   /* 下タブバーのぶんだけ空ける */
+    }
+    h1 { font-size: 1.5rem !important; line-height: 1.35 !important; }
+    [data-testid="stTabs"] [role="tablist"] {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1000;
+        display: flex;
+        gap: 0;
+        overflow-x: visible;
+        background: var(--tanin-bg, #ffffff);
+        border-top: 1px solid rgba(128, 128, 128, 0.3);
+        box-shadow: 0 -2px 14px rgba(0, 0, 0, 0.08);
+        /* iPhone のホームバーに隠れないようにする */
+        padding: 0.1rem 0 calc(0.1rem + env(safe-area-inset-bottom, 0px));
+    }
+    [data-testid="stTab"] {
+        flex: 1 1 0;
+        justify-content: center;
+        padding-left: 0.2rem;
+        padding-right: 0.2rem;
+        min-height: 48px;
+    }
+    [data-testid="stTab"] p { font-size: 0.78rem !important; }
 }
 /* はみ出し防止 */
 img, svg, table, pre, code { max-width: 100%; }
@@ -99,6 +138,46 @@ applyDecimalKeypad();
 new MutationObserver(applyDecimalKeypad).observe(
     window.parent.document.body, { childList: true, subtree: true }
 );
+
+// 下タブバーの背景に使う色を、テーマの背景色から取り出しておく
+function syncThemeColor() {
+    const doc = window.parent.document;
+    const background = getComputedStyle(doc.body).backgroundColor;
+    if (background && background !== "rgba(0, 0, 0, 0)") {
+        doc.documentElement.style.setProperty("--tanin-bg", background);
+    }
+    return background;
+}
+const themeBackground = syncThemeColor();
+new MutationObserver(syncThemeColor).observe(
+    window.parent.document.documentElement, { attributes: true, attributeFilter: ["class", "style"] }
+);
+
+// 「ホーム画面に追加」したときに、ブラウザのバーなしで開けるようにする
+function addMeta(doc, name, content) {
+    if (!content) return;
+    let tag = doc.querySelector('meta[name="' + name + '"]');
+    if (!tag) {
+        tag = doc.createElement("meta");
+        tag.setAttribute("name", name);
+        doc.head.appendChild(tag);
+    }
+    tag.setAttribute("content", content);
+}
+try {
+    // Streamlit Cloud ではアプリが iframe の中なので、いちばん外側の文書を優先する
+    const target = (function () {
+        try { return window.top.document.head ? window.top.document : window.parent.document; }
+        catch (e) { return window.parent.document; }
+    })();
+    addMeta(target, "apple-mobile-web-app-capable", "yes");
+    addMeta(target, "mobile-web-app-capable", "yes");
+    addMeta(target, "apple-mobile-web-app-status-bar-style", "default");
+    addMeta(target, "apple-mobile-web-app-title", "TanIn");
+    addMeta(target, "theme-color", themeBackground);
+} catch (e) {
+    /* 別ドメインに埋め込まれている場合は何もしない */
+}
 </script>
 """
 
