@@ -88,8 +88,9 @@ button, [role="tab"], [role="radiogroup"] label { user-select: none; }
         background: var(--tanin-bg, #ffffff);
         border-top: 1px solid rgba(128, 128, 128, 0.3);
         box-shadow: 0 -2px 14px rgba(0, 0, 0, 0.08);
-        /* iPhone のホームバーに隠れないようにする */
-        padding: 0.1rem 0 calc(0.1rem + env(safe-area-inset-bottom, 0px));
+        /* iPhone のホームバーに隠れないようにする。
+           右端は Streamlit Cloud のバッジ（右下に出る）と重ならないよう空けておく */
+        padding: 0.1rem 4.2rem calc(0.1rem + env(safe-area-inset-bottom, 0px)) 0;
     }
     [data-testid="stTab"] {
         flex: 1 1 0;
