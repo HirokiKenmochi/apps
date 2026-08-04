@@ -86,20 +86,21 @@ export default function SwipeToDeleteRow({ children, onRequestDelete }: Props) {
   }
 
   return (
-    <div className="relative overflow-hidden rounded-xl">
-      <button
-        type="button"
-        onClick={() => {
-          close()
-          onRequestDelete()
-        }}
-        tabIndex={open ? 0 : -1}
-        aria-hidden={!open}
-        style={{ width: REVEAL }}
-        className="absolute inset-y-0 right-0 flex items-center justify-center bg-rose-600 text-sm font-bold text-white"
-      >
-        削除
-      </button>
+    <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white">
+      {/* 削除ボタンはスワイプで引き出したときだけ表示する */}
+      {offset < 0 ? (
+        <button
+          type="button"
+          onClick={() => {
+            close()
+            onRequestDelete()
+          }}
+          style={{ width: REVEAL }}
+          className="absolute inset-y-0 right-0 flex items-center justify-center bg-rose-600 text-sm font-bold text-white"
+        >
+          削除
+        </button>
+      ) : null}
 
       <div
         onPointerDown={handlePointerDown}

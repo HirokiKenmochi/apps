@@ -5,7 +5,7 @@ import TaskDetailPage from './pages/TaskDetailPage'
 
 function App() {
   return (
-    <div className="mx-auto flex min-h-full w-full max-w-[480px] flex-col bg-white shadow-lg">
+    <div className="mx-auto flex min-h-screen w-full max-w-[480px] flex-col bg-white shadow-lg">
       <Routes>
         <Route path="/" element={<CategoryListPage />} />
         <Route path="/category/:categoryId" element={<TaskListPage />} />

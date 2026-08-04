@@ -7,7 +7,7 @@ export default function CategoryListPage() {
   const { categories, getTasksByCategory } = useTaskStore()
 
   return (
-    <div className="flex min-h-full flex-col">
+    <div className="flex flex-1 flex-col">
       <Header title="タスク管理" />
 
       <main className="flex-1 p-4">

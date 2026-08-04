@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 
 type Props = {
   title: string
-  /** 戻り先のパス。指定がなければブラウザ履歴を 1 つ戻る */
+  /** 戻り先のパス。指定がない画面（ホーム）では戻るボタンを出さない */
   backTo?: string
   /** ヘッダー右端に置く要素（削除ボタンなど） */
   right?: ReactNode
@@ -14,11 +14,11 @@ export default function Header({ title, backTo, right }: Props) {
 
   return (
     <header className="pt-safe sticky top-0 z-10 flex min-h-14 items-center gap-1 border-b border-slate-200 bg-white/95 px-1 backdrop-blur">
-      {backTo !== undefined || window.history.length > 1 ? (
+      {backTo !== undefined ? (
         <button
           type="button"
           aria-label="戻る"
-          onClick={() => (backTo ? navigate(backTo) : navigate(-1))}
+          onClick={() => navigate(backTo)}
           className="flex h-11 min-w-11 items-center justify-center rounded-lg px-2 text-slate-600 active:bg-slate-100"
         >
           <svg

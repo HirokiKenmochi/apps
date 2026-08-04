@@ -1,32 +1,61 @@
-# React + TypeScript + Vite
+# タスク管理アプリ
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+カテゴリごとにタスクを管理する、スマホ利用を想定したモバイルファーストの Web アプリです。
+データはブラウザの localStorage にのみ保存します（バックエンド不要）。
 
-Currently, two official plugins are available:
+## 技術スタック
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- React 19 + TypeScript（Vite）
+- Tailwind CSS v4（`@tailwindcss/vite` プラグイン）
+- React Router v7
+- localStorage（キー: `task-app:data:v1`）
 
-## React Compiler
+## 起動方法
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+npm run dev     # http://localhost:5173/
+npm run build   # 本番ビルド
+npm run preview # ビルド結果の確認
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## 画面構成
+
+| パス | 画面 | 内容 |
+| --- | --- | --- |
+| `/` | カテゴリ一覧 | 「学校」「仕事」をカード表示。カテゴリごとの完了タスク数と進捗バー |
+| `/category/:categoryId` | タスク一覧 | タスクのタイトルとチェック項目の進捗（例: 3/4）。全項目チェック済みは取り消し線＋グレーアウト |
+| `/category/:categoryId/task/:taskId` | タスク詳細 | タイトル（タップで編集）と「行う内容」のチェックリスト |
+
+## 操作
+
+- タスク追加: タスク一覧の「＋ タスクを追加」（追加後はそのタスクの詳細画面へ移動）
+- タスクのタイトル編集: 詳細画面のタイトルをタップ → Enter または入力欄の外をタップで確定（Esc で取り消し）
+- タスク削除: タスク一覧の行を左スワイプ または 長押し／詳細画面ヘッダーのゴミ箱アイコン
+- 項目の追加: 詳細画面の「＋ 項目を追加」
+- 項目のチェック切り替え: 行をタップ（再タップで解除）
+- 項目の編集: 行の右端のペンアイコン
+- 項目の削除: 行を左スワイプ または 長押し（どちらも確認ダイアログあり）
+
+## データモデル
+
+`src/types.ts` を参照。`Category` / `Task` / `TodoItem` の 3 つで構成しています。
+初期データとカテゴリごとのアクセントカラー（学校＝青系、仕事＝緑系）は `src/data/initialData.ts` にあります。
+
+## ディレクトリ構成
+
+```
+src/
+  components/   Header, TextInputSheet, ConfirmDialog, SwipeToDeleteRow
+  data/         initialData.ts（初期カテゴリ・サンプルタスク・配色）
+  hooks/        useLocalStorage.ts
+  lib/          id.ts
+  pages/        CategoryListPage / TaskListPage / TaskDetailPage
+  store/        TaskProvider.tsx（状態と更新処理）, context.ts（型と補助関数）
+```
+
+## メモ
+
+- 保存データを初期状態に戻したいときは、DevTools のコンソールで
+  `localStorage.removeItem('task-app:data:v1')` を実行してリロードしてください。
+- 画面幅 375px を基準に設計し、PC では中央に最大 480px 幅で表示します。タップ領域は最低 44px を確保しています。

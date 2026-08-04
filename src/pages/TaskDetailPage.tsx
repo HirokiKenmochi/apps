@@ -54,7 +54,7 @@ export default function TaskDetailPage() {
   }
 
   return (
-    <div className="flex min-h-full flex-col">
+    <div className="flex flex-1 flex-col">
       <Header
         title={category.name}
         backTo={`/category/${categoryId}`}
@@ -126,7 +126,7 @@ export default function TaskDetailPage() {
             {task.items.map((item) => (
               <li key={item.id}>
                 <SwipeToDeleteRow onRequestDelete={() => setDeleteItemTarget(item)}>
-                  <div className="flex items-center border border-slate-200 bg-white">
+                  <div className="flex items-center bg-white">
                     <button
                       type="button"
                       role="checkbox"

@@ -23,7 +23,7 @@ export default function TaskListPage() {
   const theme = getCategoryTheme(categoryId)
 
   return (
-    <div className="flex min-h-full flex-col">
+    <div className="flex flex-1 flex-col">
       <Header title={category.name} backTo="/" />
 
       <main className="flex-1 p-4">
@@ -47,7 +47,7 @@ export default function TaskListPage() {
                       onClick={() =>
                         navigate(`/category/${categoryId}/task/${task.id}`)
                       }
-                      className="flex min-h-14 w-full items-center gap-3 border border-slate-200 px-4 py-3 text-left active:bg-slate-50"
+                      className="flex min-h-14 w-full items-center gap-3 bg-white px-4 py-3 text-left active:bg-slate-50"
                     >
                       <span
                         className={`min-w-0 flex-1 truncate ${
