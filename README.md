@@ -4,10 +4,10 @@
 **アプリごとにフォルダが独立していて、コード・設定・依存関係・デプロイ手順はすべてそのフォルダの中で完結します。**
 別のアプリのファイルを参照している箇所はありません。
 
-| フォルダ | アプリ | 技術 | 起動 |
-| --- | --- | --- | --- |
-| [`tanin/`](tanin/) | TanIn（たんいん）— 単位換算とオームの法則の学習アプリ | Python / Streamlit | `cd tanin && .venv/bin/streamlit run app.py` |
-| [`task-app/`](task-app/) | タスク管理 — カテゴリごとにタスクを管理するモバイル向け Web アプリ | React + TypeScript / Vite | `cd task-app && npm install && npm run dev` |
+| フォルダ | アプリ | 技術 | 起動 | 公開版 |
+| --- | --- | --- | --- | --- |
+| [`tanin/`](tanin/) | TanIn（たんいん）— 単位換算とオームの法則の学習アプリ | Python / Streamlit | `cd tanin && .venv/bin/streamlit run app.py` | https://taninapp.streamlit.app |
+| [`task-app/`](task-app/) | タスク管理 — カテゴリごとにタスクを管理するモバイル向け Web アプリ | React + TypeScript / Vite | `cd task-app && npm install && npm run dev` | なし（ローカルのみ） |
 
 各アプリの詳細はフォルダ内の README を参照してください。
 

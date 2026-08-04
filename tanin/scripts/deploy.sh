@@ -15,7 +15,7 @@
 #       解釈されてしまう。参照は必ず ${name} の形で書くこと。
 set -euo pipefail
 
-APP_URL="${APP_URL:-https://tanin-app.streamlit.app}"
+APP_URL="${APP_URL:-https://taninapp.streamlit.app}"
 # Streamlit Community Cloud はアプリを /~/+/ の下で配信する。
 # 自前で streamlit run しているときは /app/static/... なので、両方を見に行く。
 VERSION_URL="${APP_URL}/~/+/app/static/version.txt"

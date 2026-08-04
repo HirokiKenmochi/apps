@@ -62,7 +62,8 @@ python3 -m venv .venv
    - Repository: `HirokiKenmochi/apps`
    - Branch: `main`
    - Main file path: `tanin/app.py`（リポジトリ直下ではなく `tanin/` フォルダの中）
-   - App URL: 好きな名前（例 `tanin`）→ 公開 URL は `https://tanin.streamlit.app`
+   - App URL: 好きな名前（6文字以上）→ 現在は `taninapp` を使用しており、公開 URL は
+     `https://taninapp.streamlit.app`
 5. **Deploy** を押す。1〜3 分でビルドが終わり、URL が使えるようになります
 
 補足
