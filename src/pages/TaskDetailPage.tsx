@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import Header from '../components/Header'
-import TextInputSheet from '../components/TextInputSheet'
+import ItemFormSheet from '../components/ItemFormSheet'
 import ConfirmDialog from '../components/ConfirmDialog'
-import SwipeToDeleteRow from '../components/SwipeToDeleteRow'
+import TodoItemList from '../components/TodoItemList'
 import { getCategoryTheme } from '../data/initialData'
 import { countItems, useTaskStore } from '../store/context'
 import type { TodoItem } from '../types'
@@ -17,7 +17,7 @@ export default function TaskDetailPage() {
     renameTask,
     deleteTask,
     addItem,
-    updateItemText,
+    updateItem,
     toggleItem,
     deleteItem,
   } = useTaskStore()
@@ -25,9 +25,13 @@ export default function TaskDetailPage() {
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
   const [addOpen, setAddOpen] = useState(false)
+  /** サブ項目の追加先。null なら最上位への追加 */
+  const [addParent, setAddParent] = useState<TodoItem | null>(null)
   const [editTarget, setEditTarget] = useState<TodoItem | null>(null)
   const [deleteItemTarget, setDeleteItemTarget] = useState<TodoItem | null>(null)
   const [deleteTaskOpen, setDeleteTaskOpen] = useState(false)
+  /** 折りたたみ中の項目 ID（表示上の状態なので保存はしない） */
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set())
   const titleInputRef = useRef<HTMLInputElement>(null)
 
   const category = getCategory(categoryId)
@@ -51,6 +55,29 @@ export default function TaskDetailPage() {
   const commitTitle = () => {
     renameTask(task.id, titleDraft)
     setEditingTitle(false)
+  }
+
+  const toggleCollapse = (item: TodoItem) => {
+    setCollapsedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(item.id)) next.delete(item.id)
+      else next.add(item.id)
+      return next
+    })
+  }
+
+  const openAddSheet = (parent: TodoItem | null) => {
+    setAddParent(parent)
+    setAddOpen(true)
+    // 追加先が折りたたまれていると追加した項目が見えないので開いておく
+    if (parent) {
+      setCollapsedIds((prev) => {
+        if (!prev.has(parent.id)) return prev
+        const next = new Set(prev)
+        next.delete(parent.id)
+        return next
+      })
+    }
   }
 
   return (
@@ -122,79 +149,21 @@ export default function TaskDetailPage() {
             下の「＋ 項目を追加」から追加できます。
           </p>
         ) : (
-          <ul className="flex flex-col gap-2">
-            {task.items.map((item) => (
-              <li key={item.id}>
-                <SwipeToDeleteRow onRequestDelete={() => setDeleteItemTarget(item)}>
-                  <div className="flex items-center bg-white">
-                    <button
-                      type="button"
-                      role="checkbox"
-                      aria-checked={item.checked}
-                      onClick={() => toggleItem(task.id, item.id)}
-                      className="flex min-h-12 flex-1 items-center gap-3 px-3 py-2 text-left active:bg-slate-50"
-                    >
-                      <span
-                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 ${
-                          item.checked
-                            ? `${theme.bar} border-transparent text-white`
-                            : 'border-slate-300 bg-white'
-                        }`}
-                      >
-                        {item.checked ? (
-                          <svg
-                            viewBox="0 0 24 24"
-                            className="h-4 w-4"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth={3}
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            aria-hidden="true"
-                          >
-                            <path d="M5 13l4 4L19 7" />
-                          </svg>
-                        ) : null}
-                      </span>
-                      <span
-                        className={`min-w-0 flex-1 break-words ${
-                          item.checked
-                            ? 'text-slate-400 line-through'
-                            : 'text-slate-800'
-                        }`}
-                      >
-                        {item.text}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="この項目を編集"
-                      onClick={() => setEditTarget(item)}
-                      className="flex h-12 min-w-11 items-center justify-center text-slate-400 active:bg-slate-100"
-                    >
-                      <svg
-                        viewBox="0 0 24 24"
-                        className="h-4 w-4"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
-                        <path d="M4 20h4l10-10-4-4L4 16v4zM14 6l4 4" />
-                      </svg>
-                    </button>
-                  </div>
-                </SwipeToDeleteRow>
-              </li>
-            ))}
-          </ul>
+          <TodoItemList
+            items={task.items}
+            theme={theme}
+            collapsedIds={collapsedIds}
+            onToggleCollapse={toggleCollapse}
+            onToggleCheck={(item) => toggleItem(task.id, item.id)}
+            onAddChild={(item) => openAddSheet(item)}
+            onEdit={(item) => setEditTarget(item)}
+            onDelete={(item) => setDeleteItemTarget(item)}
+          />
         )}
 
         {task.items.length > 0 ? (
-          <p className="mt-3 px-1 text-xs text-slate-400">
-            項目は左スワイプ、または長押しで削除できます。
+          <p className="mt-3 px-1 text-xs leading-relaxed text-slate-400">
+            ＋ でサブ項目を追加、✎ で内容と説明を編集できます。項目は左スワイプ、または長押しで削除できます。
           </p>
         ) : null}
       </main>
@@ -202,28 +171,38 @@ export default function TaskDetailPage() {
       <div className="pb-safe sticky bottom-0 border-t border-slate-200 bg-white p-4">
         <button
           type="button"
-          onClick={() => setAddOpen(true)}
+          onClick={() => openAddSheet(null)}
           className="min-h-12 w-full rounded-xl bg-slate-800 text-base font-bold text-white active:bg-slate-700"
         >
           ＋ 項目を追加
         </button>
       </div>
 
-      <TextInputSheet
+      <ItemFormSheet
         open={addOpen}
-        title="行う内容を追加"
-        placeholder="例: 資料をまとめる"
+        title={
+          addParent ? `「${addParent.text}」にサブ項目を追加` : '行う内容を追加'
+        }
         submitLabel="追加"
-        onSubmit={(value) => addItem(task.id, value)}
-        onClose={() => setAddOpen(false)}
+        onSubmit={(text, description) =>
+          addItem(task.id, text, {
+            description,
+            parentId: addParent?.id,
+          })
+        }
+        onClose={() => {
+          setAddOpen(false)
+          setAddParent(null)
+        }}
       />
 
-      <TextInputSheet
+      <ItemFormSheet
         open={editTarget !== null}
         title="行う内容を編集"
-        initialValue={editTarget?.text ?? ''}
-        onSubmit={(value) =>
-          editTarget && updateItemText(task.id, editTarget.id, value)
+        initialText={editTarget?.text ?? ''}
+        initialDescription={editTarget?.description ?? ''}
+        onSubmit={(text, description) =>
+          editTarget && updateItem(task.id, editTarget.id, { text, description })
         }
         onClose={() => setEditTarget(null)}
       />
@@ -231,7 +210,15 @@ export default function TaskDetailPage() {
       <ConfirmDialog
         open={deleteItemTarget !== null}
         title="項目を削除しますか？"
-        message={deleteItemTarget ? `「${deleteItemTarget.text}」を削除します。` : ''}
+        message={
+          deleteItemTarget
+            ? `「${deleteItemTarget.text}」${
+                deleteItemTarget.children?.length
+                  ? `とそのサブ項目 ${deleteItemTarget.children.length} 件`
+                  : ''
+              }を削除します。`
+            : ''
+        }
         onConfirm={() =>
           deleteItemTarget && deleteItem(task.id, deleteItemTarget.id)
         }

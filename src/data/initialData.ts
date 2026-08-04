@@ -13,8 +13,27 @@ export const initialData: AppData = {
       title: 'レポート課題',
       items: [
         { id: 'item-sample-1', text: 'テーマを決める', checked: true },
-        { id: 'item-sample-2', text: '資料を集める', checked: true },
-        { id: 'item-sample-3', text: '本文を書く', checked: false },
+        {
+          id: 'item-sample-2',
+          text: '資料を集める',
+          description: '図書館とネットの両方で探す。締切は金曜まで。',
+          checked: true,
+        },
+        {
+          id: 'item-sample-3',
+          text: '本文を書く',
+          checked: false,
+          children: [
+            { id: 'item-sample-3-1', text: '構成を考える', checked: true },
+            {
+              id: 'item-sample-3-2',
+              text: '下書きする',
+              description: '2000字くらいを目安に。',
+              checked: false,
+            },
+            { id: 'item-sample-3-3', text: '見直す', checked: false },
+          ],
+        },
         { id: 'item-sample-4', text: '提出する', checked: false },
       ],
       createdAt: '2026-01-05T09:00:00.000Z',

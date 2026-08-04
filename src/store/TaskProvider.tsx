@@ -2,6 +2,7 @@ import { useCallback, useMemo, type ReactNode } from 'react'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import { initialData } from '../data/initialData'
 import { createId } from '../lib/id'
+import { appendItem, isLeaf, mapItem, removeItem } from '../lib/items'
 import type { AppData, Category, Task, TodoItem } from '../types'
 import { TaskStoreContext, type TaskStore } from './context'
 
@@ -121,37 +122,47 @@ export function TaskProvider({ children }: { children: ReactNode }) {
         }))
       },
 
-      addItem: (taskId, text) => {
+      addItem: (taskId, text, options) => {
         const trimmed = text.trim()
         if (!trimmed) return
-        updateItems(taskId, (items) => [
-          ...items,
-          { id: createId('item'), text: trimmed, checked: false },
-        ])
+        const description = options?.description?.trim()
+        const newItem: TodoItem = {
+          id: createId('item'),
+          text: trimmed,
+          checked: false,
+          ...(description ? { description } : {}),
+        }
+        updateItems(taskId, (items) =>
+          appendItem(items, newItem, options?.parentId),
+        )
       },
 
-      updateItemText: (taskId, itemId, text) => {
-        const trimmed = text.trim()
-        if (!trimmed) return
+      updateItem: (taskId, itemId, patch) => {
+        const text = patch.text?.trim()
+        const description = patch.description?.trim()
         updateItems(taskId, (items) =>
-          items.map((item) =>
-            item.id === itemId ? { ...item, text: trimmed } : item,
-          ),
+          mapItem(items, itemId, (item) => ({
+            ...item,
+            ...(text ? { text } : {}),
+            // 空文字で保存されたときは説明を消す
+            ...(patch.description === undefined
+              ? {}
+              : { description: description || undefined }),
+          })),
         )
       },
 
       toggleItem: (taskId, itemId) => {
         updateItems(taskId, (items) =>
-          items.map((item) =>
-            item.id === itemId ? { ...item, checked: !item.checked } : item,
+          mapItem(items, itemId, (item) =>
+            // サブ項目を持つ項目のチェックは子から決まるので変更しない
+            isLeaf(item) ? { ...item, checked: !item.checked } : item,
           ),
         )
       },
 
       deleteItem: (taskId, itemId) => {
-        updateItems(taskId, (items) =>
-          items.filter((item) => item.id !== itemId),
-        )
+        updateItems(taskId, (items) => removeItem(items, itemId))
       },
     }
   }, [data, setData, updateTask, updateItems])

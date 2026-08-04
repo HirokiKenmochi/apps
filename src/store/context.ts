@@ -1,4 +1,5 @@
 import { createContext, useContext } from 'react'
+import { countLeaves } from '../lib/items'
 import type { Category, CategoryColor, Task } from '../types'
 
 export type TaskStore = {
@@ -23,9 +24,20 @@ export type TaskStore = {
   renameTask: (taskId: string, title: string) => void
   deleteTask: (taskId: string) => void
 
-  addItem: (taskId: string, text: string) => void
-  updateItemText: (taskId: string, itemId: string, text: string) => void
+  /** parentId を渡すとその項目のサブ項目として追加する */
+  addItem: (
+    taskId: string,
+    text: string,
+    options?: { description?: string; parentId?: string },
+  ) => void
+  updateItem: (
+    taskId: string,
+    itemId: string,
+    patch: { text?: string; description?: string },
+  ) => void
+  /** 末端の項目のみ切り替わる（サブ項目を持つ項目は子から算出される） */
   toggleItem: (taskId: string, itemId: string) => void
+  /** サブ項目ごと削除する */
   deleteItem: (taskId: string, itemId: string) => void
 }
 
@@ -39,14 +51,13 @@ export function useTaskStore(): TaskStore {
   return store
 }
 
-/** チェック済み / 全体 の件数を返す */
+/** 完了 / 全体 の件数を返す（数えるのは末端の項目のみ） */
 export function countItems(task: Task) {
-  const total = task.items.length
-  const done = task.items.filter((item) => item.checked).length
-  return { done, total }
+  return countLeaves(task.items)
 }
 
-/** すべての項目がチェック済みなら完了扱い（項目が 0 件のタスクは未完了） */
+/** 末端の項目がすべてチェック済みなら完了扱い（項目が 0 件のタスクは未完了） */
 export function isTaskDone(task: Task) {
-  return task.items.length > 0 && task.items.every((item) => item.checked)
+  const { done, total } = countLeaves(task.items)
+  return total > 0 && done === total
 }
