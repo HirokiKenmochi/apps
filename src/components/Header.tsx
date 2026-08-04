@@ -13,7 +13,7 @@ export default function Header({ title, backTo, right }: Props) {
   const navigate = useNavigate()
 
   return (
-    <header className="sticky top-0 z-10 flex min-h-14 items-center gap-1 border-b border-slate-200 bg-white/95 px-1 backdrop-blur">
+    <header className="pt-safe sticky top-0 z-10 flex min-h-14 items-center gap-1 border-b border-slate-200 bg-white/95 px-1 backdrop-blur">
       {backTo !== undefined || window.history.length > 1 ? (
         <button
           type="button"

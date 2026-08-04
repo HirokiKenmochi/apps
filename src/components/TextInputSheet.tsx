@@ -56,7 +56,7 @@ export default function TextInputSheet({
       />
       <form
         onSubmit={handleSubmit}
-        className="relative w-full max-w-[480px] rounded-t-2xl bg-white p-4 pb-6 shadow-xl"
+        className="pb-safe relative w-full max-w-[480px] rounded-t-2xl bg-white p-4 shadow-xl"
       >
         <p className="mb-3 text-base font-bold text-slate-800">{title}</p>
         <input

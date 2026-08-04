@@ -8,11 +8,15 @@ body,
 
 body {
   margin: 0;
-  background-color: #e2e8f0;
+  background-color: #e2e8f0; /* 端末より広い画面では余白をグレーにする */
   color: #1e293b;
   font-family: system-ui, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior-y: none;
+}
+
+button {
+  font-family: inherit;
 }
 
 /* 長押し時の選択・iOS のコールアウトを抑制する */
@@ -20,4 +24,13 @@ body {
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
+}
+
+/* ノッチ / ホームバーを避けるための余白 */
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.pb-safe {
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
 }

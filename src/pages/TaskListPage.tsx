@@ -74,7 +74,7 @@ export default function TaskListPage() {
         )}
       </main>
 
-      <div className="sticky bottom-0 border-t border-slate-200 bg-white p-4">
+      <div className="pb-safe sticky bottom-0 border-t border-slate-200 bg-white p-4">
         <button
           type="button"
           onClick={() => setAddOpen(true)}
