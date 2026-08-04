@@ -1,17 +1,2 @@
-# Python
-__pycache__/
-*.py[cod]
-.venv/
-venv/
-*.egg-info/
-
-# ツールのキャッシュ
-.pytest_cache/
-.ruff_cache/
-.mypy_cache/
-
-# Streamlit（テーマ設定 config.toml はコミットする。秘密情報だけ除外）
-.streamlit/secrets.toml
-
-# macOS
+# リポジトリ共通のものだけ。各アプリ固有の除外は各フォルダの .gitignore に書く。
 .DS_Store

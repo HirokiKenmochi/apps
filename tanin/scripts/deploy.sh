@@ -45,7 +45,8 @@ if [ -n "${DRY_RUN}" ]; then
 fi
 
 echo "▶ コミットして push"
-git add -A
+# 同じリポジトリに別のアプリが同居しているので、TanIn のフォルダだけをコミットする
+git add -A .
 git commit -q -m "${message}" || echo "  コミットする変更はありませんでした"
 commit="$(git rev-parse --short HEAD)"
 git push origin main
