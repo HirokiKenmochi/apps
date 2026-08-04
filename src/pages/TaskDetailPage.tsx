@@ -40,7 +40,7 @@ export default function TaskDetailPage() {
   if (!category) return <Navigate to="/" replace />
   if (!task) return <Navigate to={`/category/${categoryId}`} replace />
 
-  const theme = getCategoryTheme(categoryId)
+  const theme = getCategoryTheme(category)
   const { done, total } = countItems(task)
 
   const startTitleEdit = () => {

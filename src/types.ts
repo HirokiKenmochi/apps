@@ -1,6 +1,17 @@
+/** カテゴリのアクセントカラー */
+export type CategoryColor =
+  | 'sky'
+  | 'emerald'
+  | 'amber'
+  | 'violet'
+  | 'rose'
+  | 'slate'
+
 export type Category = {
   id: string
-  name: string // "学校" | "仕事"
+  name: string // "学校" | "仕事" など
+  /** 未指定の場合は既定色にフォールバックする */
+  color?: CategoryColor
 }
 
 export type TodoItem = {

@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react'
-import type { Category, Task } from '../types'
+import type { Category, CategoryColor, Task } from '../types'
 
 export type TaskStore = {
   categories: Category[]
@@ -10,6 +10,14 @@ export type TaskStore = {
   getTasksByCategory: (categoryId: string) => Task[]
   /** タスクを ID で取得（存在しなければ undefined） */
   getTask: (taskId: string) => Task | undefined
+
+  addCategory: (name: string, color: CategoryColor) => Category
+  updateCategory: (
+    categoryId: string,
+    patch: { name?: string; color?: CategoryColor },
+  ) => void
+  /** カテゴリと、それに属するタスクをまとめて削除する */
+  deleteCategory: (categoryId: string) => void
 
   addTask: (categoryId: string, title: string) => Task
   renameTask: (taskId: string, title: string) => void

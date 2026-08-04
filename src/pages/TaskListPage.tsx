@@ -20,7 +20,7 @@ export default function TaskListPage() {
   if (!category) return <Navigate to="/" replace />
 
   const tasks = getTasksByCategory(categoryId)
-  const theme = getCategoryTheme(categoryId)
+  const theme = getCategoryTheme(category)
 
   return (
     <div className="flex flex-1 flex-col">

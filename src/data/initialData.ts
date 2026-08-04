@@ -1,10 +1,10 @@
-import type { AppData } from '../types'
+import type { AppData, Category, CategoryColor } from '../types'
 
 /** 初回起動時に投入するカテゴリと動作確認用のサンプルタスク */
 export const initialData: AppData = {
   categories: [
-    { id: 'school', name: '学校' },
-    { id: 'work', name: '仕事' },
+    { id: 'school', name: '学校', color: 'sky' },
+    { id: 'work', name: '仕事', color: 'emerald' },
   ],
   tasks: [
     {
@@ -57,31 +57,78 @@ export type CategoryTheme = {
   accent: string
 }
 
-const themes: Record<string, CategoryTheme> = {
-  school: {
+/** カテゴリ追加時に選べる色 */
+export const CATEGORY_COLORS: { key: CategoryColor; label: string }[] = [
+  { key: 'sky', label: '青' },
+  { key: 'emerald', label: '緑' },
+  { key: 'amber', label: 'オレンジ' },
+  { key: 'violet', label: '紫' },
+  { key: 'rose', label: 'ピンク' },
+  { key: 'slate', label: 'グレー' },
+]
+
+// Tailwind はクラス名を静的に読み取るため、色ごとに全クラスを書き出しておく
+const themes: Record<CategoryColor, CategoryTheme> = {
+  sky: {
     bar: 'bg-sky-500',
     soft: 'bg-sky-50',
     text: 'text-sky-700',
     border: 'border-sky-200',
     accent: 'accent-sky-600',
   },
-  work: {
+  emerald: {
     bar: 'bg-emerald-500',
     soft: 'bg-emerald-50',
     text: 'text-emerald-700',
     border: 'border-emerald-200',
     accent: 'accent-emerald-600',
   },
+  amber: {
+    bar: 'bg-amber-500',
+    soft: 'bg-amber-50',
+    text: 'text-amber-700',
+    border: 'border-amber-200',
+    accent: 'accent-amber-600',
+  },
+  violet: {
+    bar: 'bg-violet-500',
+    soft: 'bg-violet-50',
+    text: 'text-violet-700',
+    border: 'border-violet-200',
+    accent: 'accent-violet-600',
+  },
+  rose: {
+    bar: 'bg-rose-500',
+    soft: 'bg-rose-50',
+    text: 'text-rose-700',
+    border: 'border-rose-200',
+    accent: 'accent-rose-600',
+  },
+  slate: {
+    bar: 'bg-slate-500',
+    soft: 'bg-slate-50',
+    text: 'text-slate-700',
+    border: 'border-slate-200',
+    accent: 'accent-slate-600',
+  },
 }
 
-const fallbackTheme: CategoryTheme = {
-  bar: 'bg-slate-400',
-  soft: 'bg-slate-50',
-  text: 'text-slate-700',
-  border: 'border-slate-200',
-  accent: 'accent-slate-600',
+/** 色未設定の古いデータ向けのフォールバック */
+const legacyColorById: Record<string, CategoryColor> = {
+  school: 'sky',
+  work: 'emerald',
 }
 
-export function getCategoryTheme(categoryId: string): CategoryTheme {
-  return themes[categoryId] ?? fallbackTheme
+export function getTheme(color: CategoryColor): CategoryTheme {
+  return themes[color]
+}
+
+/** 色未設定のカテゴリも含めて、実際に使う色を返す */
+export function resolveCategoryColor(category: Category): CategoryColor {
+  return category.color ?? legacyColorById[category.id] ?? 'slate'
+}
+
+export function getCategoryTheme(category?: Category): CategoryTheme {
+  if (!category) return themes.slate
+  return themes[resolveCategoryColor(category)]
 }

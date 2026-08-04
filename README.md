@@ -23,12 +23,15 @@ npm run preview # ビルド結果の確認
 
 | パス | 画面 | 内容 |
 | --- | --- | --- |
-| `/` | カテゴリ一覧 | 「学校」「仕事」をカード表示。カテゴリごとの完了タスク数と進捗バー |
+| `/` | カテゴリ一覧 | カテゴリをカード表示。カテゴリごとの完了タスク数と進捗バー。カテゴリの追加・編集・削除もここから |
 | `/category/:categoryId` | タスク一覧 | タスクのタイトルとチェック項目の進捗（例: 3/4）。全項目チェック済みは取り消し線＋グレーアウト |
 | `/category/:categoryId/task/:taskId` | タスク詳細 | タイトル（タップで編集）と「行う内容」のチェックリスト |
 
 ## 操作
 
+- カテゴリ追加: カテゴリ一覧の「＋ カテゴリを追加」（名前とアクセントカラー6色から選択）
+- カテゴリの名前・色の変更: カードの右端のペンアイコン
+- カテゴリ削除: カードを左スワイプ または 長押し（そのカテゴリのタスクも一緒に削除、確認ダイアログあり）
 - タスク追加: タスク一覧の「＋ タスクを追加」（追加後はそのタスクの詳細画面へ移動）
 - タスクのタイトル編集: 詳細画面のタイトルをタップ → Enter または入力欄の外をタップで確定（Esc で取り消し）
 - タスク削除: タスク一覧の行を左スワイプ または 長押し／詳細画面ヘッダーのゴミ箱アイコン
@@ -40,13 +43,14 @@ npm run preview # ビルド結果の確認
 ## データモデル
 
 `src/types.ts` を参照。`Category` / `Task` / `TodoItem` の 3 つで構成しています。
-初期データとカテゴリごとのアクセントカラー（学校＝青系、仕事＝緑系）は `src/data/initialData.ts` にあります。
+`Category.color` は任意項目で、未設定の場合は既定色（学校＝青系、仕事＝緑系、それ以外＝グレー）にフォールバックします。
+初期データと配色の定義は `src/data/initialData.ts` にあります。
 
 ## ディレクトリ構成
 
 ```
 src/
-  components/   Header, TextInputSheet, ConfirmDialog, SwipeToDeleteRow
+  components/   Header, TextInputSheet, CategoryFormSheet, ConfirmDialog, SwipeToDeleteRow
   data/         initialData.ts（初期カテゴリ・サンプルタスク・配色）
   hooks/        useLocalStorage.ts
   lib/          id.ts

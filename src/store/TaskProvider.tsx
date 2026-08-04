@@ -2,7 +2,7 @@ import { useCallback, useMemo, type ReactNode } from 'react'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import { initialData } from '../data/initialData'
 import { createId } from '../lib/id'
-import type { AppData, Task, TodoItem } from '../types'
+import type { AppData, Category, Task, TodoItem } from '../types'
 import { TaskStoreContext, type TaskStore } from './context'
 
 const STORAGE_KEY = 'task-app:data:v1'
@@ -56,6 +56,45 @@ export function TaskProvider({ children }: { children: ReactNode }) {
           .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
 
       getTask: (taskId) => data.tasks.find((task) => task.id === taskId),
+
+      addCategory: (name, color) => {
+        const category: Category = {
+          id: createId('category'),
+          name: name.trim(),
+          color,
+        }
+        setData((prev) => ({
+          ...prev,
+          categories: [...prev.categories, category],
+        }))
+        return category
+      },
+
+      updateCategory: (categoryId, patch) => {
+        const name = patch.name?.trim()
+        setData((prev) => ({
+          ...prev,
+          categories: prev.categories.map((category) =>
+            category.id === categoryId
+              ? {
+                  ...category,
+                  ...(name ? { name } : {}),
+                  ...(patch.color ? { color: patch.color } : {}),
+                }
+              : category,
+          ),
+        }))
+      },
+
+      deleteCategory: (categoryId) => {
+        setData((prev) => ({
+          categories: prev.categories.filter(
+            (category) => category.id !== categoryId,
+          ),
+          // 所属タスクが残らないよう一緒に削除する
+          tasks: prev.tasks.filter((task) => task.categoryId !== categoryId),
+        }))
+      },
 
       addTask: (categoryId, title) => {
         const task: Task = {
